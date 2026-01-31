@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高并发数据处理系统 - 配置管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px 0;
+        }
+
+        .status-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status-value {
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .status-ok {
+            color: #52c41a;
+        }
+
+        .status-error {
+            color: #f5222d;
+        }
+
+        .config-section {
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-danger {
+            background: #f5222d;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #d9001b;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .metric-box {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            color: #666;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+            color: #52c41a;
+        }
+
+        .alert-error {
+            background: #fff1f0;
+            border: 1px solid #ffccc7;
+            color: #f5222d;
+        }
+
+        .alert-info {
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+            color: #0050b3;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #667eea;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 40px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 高并发数据处理系统</h1>
+            <p>实时配置管理与性能监控平台</p>
+        </header>
+
+        <div class="grid">
+            <!-- 健康状态 -->
+            <div class="card">
+                <h2>系统状态</h2>
+                <div class="status-item">
+                    <span class="status-label">应用状态</span>
+                    <span class="status-value status-ok" id="app-status">正常</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Redis连接</span>
+                    <span class="status-value status-ok" id="redis-status">已连接</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">应用版本</span>
+                    <span class="status-value" id="app-version">加载中...</span>
+                </div>
+            </div>
+
+            <!-- 实时指标 -->
+            <div class="card">
+                <h2>处理指标</h2>
+                <div class="metrics-grid">
+                    <div class="metric-box">
+                        <div class="metric-value" id="processed-count">0</div>
+                        <div class="metric-label">已处理</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-value" id="failed-count">0</div>
+                        <div class="metric-label">失败</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-value" id="avg-latency">0ms</div>
+                        <div class="metric-label">平均延迟</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 快速操作 -->
+            <div class="card">
+                <h2>快速操作</h2>
+                <button class="btn-primary" onclick="refreshMetrics()"
+                    style="width: 100%; margin-bottom: 10px;">刷新指标</button>
+                <button class="btn-secondary" onclick="resetMetrics()"
+                    style="width: 100%; margin-bottom: 10px;">重置指标</button>
+                <button class="btn-danger" onclick="clearRedisKeys()" style="width: 100%;">清空Redis键</button>
+            </div>
+        </div>
+
+        <!-- 配置管理标签 -->
+        <div class="card">
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="switchTab('server-config')">服务器配置</button>
+                <button class="tab-btn" onclick="switchTab('redis-config')">Redis配置</button>
+                <button class="tab-btn" onclick="switchTab('app-config')">应用配置</button>
+                <button class="tab-btn" onclick="switchTab('data-process')">数据处理</button>
+            </div>
+
+            <!-- 服务器配置 -->
+            <div id="server-config" class="tab-content active">
+                <h2 style="margin-bottom: 20px;">服务器配置</h2>
+                <div class="form-group">
+                    <label>端口号</label>
+                    <input type="text" id="server-port" placeholder="8080" readonly>
+                </div>
+                <div class="form-group">
+                    <label>读超时 (秒)</label>
+                    <input type="number" id="server-read-timeout" min="1">
+                </div>
+                <div class="form-group">
+                    <label>写超时 (秒)</label>
+                    <input type="number" id="server-write-timeout" min="1">
+                </div>
+                <div class="form-group">
+                    <label>最大工作线程</label>
+                    <input type="number" id="server-max-workers" min="1">
+                </div>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="saveConfig('server')">保存配置</button>
+                    <button class="btn-secondary" onclick="loadConfig()">刷新</button>
+                </div>
+            </div>
+
+            <!-- Redis配置 -->
+            <div id="redis-config" class="tab-content">
+                <h2 style="margin-bottom: 20px;">Redis配置</h2>
+                <div class="form-group">
+                    <label>主机地址</label>
+                    <input type="text" id="redis-host" placeholder="localhost" readonly>
+                </div>
+                <div class="form-group">
+                    <label>端口</label>
+                    <input type="text" id="redis-port" placeholder="6379" readonly>
+                </div>
+                <div class="form-group">
+                    <label>数据库</label>
+                    <input type="number" id="redis-db" min="0" max="15" readonly>
+                </div>
+                <div class="form-group">
+                    <label>连接池大小</label>
+                    <input type="number" id="redis-pool-size" min="1">
+                </div>
+                <div class="form-group">
+                    <label>最大重试次数</label>
+                    <input type="number" id="redis-max-retry" min="0">
+                </div>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="saveConfig('redis')">保存配置</button>
+                    <button class="btn-secondary" onclick="loadConfig()">刷新</button>
+                </div>
+            </div>
+
+            <!-- 应用配置 -->
+            <div id="app-config" class="tab-content">
+                <h2 style="margin-bottom: 20px;">应用配置</h2>
+                <div class="form-group">
+                    <label>应用名称</label>
+                    <input type="text" id="app-name" readonly>
+                </div>
+                <div class="form-group">
+                    <label>批处理大小</label>
+                    <input type="number" id="batch-size" min="1">
+                </div>
+                <div class="form-group">
+                    <label>工作线程数</label>
+                    <input type="number" id="workers" min="1">
+                </div>
+                <div class="form-group">
+                    <label>队列大小</label>
+                    <input type="number" id="queue-size" min="1">
+                </div>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="saveConfig('app')">保存配置</button>
+                    <button class="btn-secondary" onclick="loadConfig()">刷新</button>
+                </div>
+            </div>
+
+            <!-- 数据处理 -->
+            <div id="data-process" class="tab-content">
+                <h2 style="margin-bottom: 20px;">数据处理</h2>
+                <div id="process-alert"></div>
+
+                <div class="form-group">
+                    <label>处理单条数据 (JSON格式)</label>
+                    <textarea id="process-data"
+                        style="width: 100%; height: 100px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"
+                        placeholder='{"name": "example", "value": 123}'></textarea>
+                </div>
+                <button class="btn-primary" onclick="processData()"
+                    style="width: 100%; margin-bottom: 15px;">处理数据</button>
+
+                <div class="form-group">
+                    <label>队列键名</label>
+                    <input type="text" id="queue-key" placeholder="data:queue">
+                </div>
+                <div class="form-group">
+                    <label>每次处理条数</label>
+                    <input type="number" id="queue-batch-size" min="1" value="100">
+                </div>
+                <button class="btn-primary" onclick="processQueue()" style="width: 100%;">处理队列</button>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2024 高并发数据处理系统 | 版本 1.0.0</p>
+        </footer>
+    </div>
+
+    <script>
+        // 工具函数
+        const API_BASE = '/api';
+
+        async function fetchAPI(endpoint, options = {}) {
+            try {
+                const response = await fetch(API_BASE + endpoint, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                showAlert(`请求失败: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        async function loadConfig() {
+            const data = await fetchAPI('/config');
+            if (!data) return;
+
+            // 服务器配置
+            document.getElementById('server-port').value = data.server.Port;
+            document.getElementById('server-read-timeout').value = data.server.ReadTimeout;
+            document.getElementById('server-write-timeout').value = data.server.WriteTimeout;
+            document.getElementById('server-max-workers').value = data.server.MaxWorkers;
+
+            // Redis配置
+            document.getElementById('redis-host').value = data.redis.Host;
+            document.getElementById('redis-port').value = data.redis.Port;
+            document.getElementById('redis-db').value = data.redis.DB;
+            document.getElementById('redis-pool-size').value = data.redis.PoolSize;
+            document.getElementById('redis-max-retry').value = data.redis.MaxRetry;
+
+            // 应用配置
+            document.getElementById('app-name').value = data.app.Name;
+            document.getElementById('app-version').textContent = data.app.Version;
+            document.getElementById('batch-size').value = data.app.BatchSize;
+            document.getElementById('workers').value = data.app.Workers;
+            document.getElementById('queue-size').value = data.app.QueueSize;
+        }
+
+        async function refreshMetrics() {
+            const data = await fetchAPI('/metrics');
+            if (!data) return;
+
+            document.getElementById('processed-count').textContent = data.ProcessedCount || 0;
+            document.getElementById('failed-count').textContent = data.FailedCount || 0;
+            document.getElementById('avg-latency').textContent = (data.AverageLatency || 0).toFixed(2) + 'ms';
+        }
+
+        async function resetMetrics() {
+            if (!confirm('确定要重置指标吗?')) return;
+
+            const data = await fetchAPI('/metrics/reset', { method: 'POST' });
+            if (data) {
+                showAlert('指标已重置', 'success');
+                refreshMetrics();
+            }
+        }
+
+        async function saveConfig(section) {
+            const config = {};
+            showAlert('配置已更新 (演示模式)', 'info');
+        }
+
+        async function processData() {
+            const dataStr = document.getElementById('process-data').value;
+            if (!dataStr) {
+                showAlert('请输入数据', 'error');
+                return;
+            }
+
+            try {
+                const data = JSON.parse(dataStr);
+                const result = await fetchAPI('/process', {
+                    method: 'POST',
+                    body: JSON.stringify({ data })
+                });
+
+                if (result) {
+                    showAlert('数据处理成功', 'success');
+                    document.getElementById('process-data').value = '';
+                    refreshMetrics();
+                }
+            } catch (error) {
+                showAlert('JSON格式错误', 'error');
+            }
+        }
+
+        async function processQueue() {
+            const queueKey = document.getElementById('queue-key').value;
+            const batchSize = parseInt(document.getElementById('queue-batch-size').value);
+
+            if (!queueKey) {
+                showAlert('请输入队列键名', 'error');
+                return;
+            }
+
+            const result = await fetchAPI('/process/queue', {
+                method: 'POST',
+                body: JSON.stringify({ queue_key: queueKey, batch_size: batchSize })
+            });
+
+            if (result) {
+                showAlert(`已处理 ${result.processed} 条数据`, 'success');
+                refreshMetrics();
+            }
+        }
+
+        async function clearRedisKeys() {
+            if (!confirm('确定要清空所有Redis键吗? 此操作不可撤销!')) return;
+
+            const result = await fetchAPI('/redis/keys');
+            if (result && result.keys) {
+                for (const key of result.keys) {
+                    await fetchAPI(`/redis/key/${key}`, { method: 'DELETE' });
+                }
+                showAlert('Redis已清空', 'success');
+            }
+        }
+
+        function switchTab(tabId) {
+            // 隐藏所有标签内容
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('active');
+            });
+
+            // 显示选中的标签
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function showAlert(message, type = 'info') {
+            const alertDiv = document.getElementById('process-alert') || document.createElement('div');
+            alertDiv.id = 'process-alert';
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+
+            const processTab = document.getElementById('data-process');
+            if (processTab) {
+                processTab.insertBefore(alertDiv, processTab.firstChild);
+                setTimeout(() => alertDiv.remove(), 3000);
+            }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadConfig();
+            refreshMetrics();
+
+            // 每5秒刷新一次指标
+            setInterval(refreshMetrics, 5000);
+        });
+    </script>
+</body>
+
+</html>
