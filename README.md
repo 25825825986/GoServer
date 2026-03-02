@@ -1,205 +1,179 @@
 # 高并发数据处理系统
 
-**轻量级、可扩展的 Go + Redis 并发数据处理平台**
+基于Go语言的轻量级高并发数据处理系统，支持TCP长连接、消息队列（发布订阅）、批量处理和实时监控。
 
-这是一个基于 Go 与 Redis 的高并发数据处理示例项目，包含 Web UI、监控指标、任务队列与 Docker 一键部署方案，适合用于原型验证与教学示例。
+## 系统特性
 
----
+- **高并发处理**：单机支持1万+并发TCP连接
+- **高性能**：目标QPS 5000+，平均延迟<50ms
+- **消息队列**：内置发布订阅模式，支持Redis消息队列
+- **连接管理**：心跳检测、连接超时、自动重连
+- **Goroutine池**：可配置的工作协程池，控制并发度
+- **监控统计**：实时性能指标，支持Prometheus格式
+- **协议设计**：JSON通信协议，易于扩展和调试
 
-## 关键要点
+## 系统架构
 
-- 语言：Go 1.21+
-- 运行方式：Docker / 本地运行
-- 存储：Redis（可选外部服务或容器）
-- 主要功能：并发任务处理、队列批量处理、实时监控、配置管理
+```
+客户端(TCP长连接)
+    │
+    ▼
+TCP Server (Go net/tcp)
+    │
+    ▼
+Worker Pool (Goroutine池)
+    │
+    ▼
+Processor (业务处理器)
+    │
+    ├──► Redis (数据存储/消息队列)
+    └──► 订阅推送
+```
 
----
+## 快速开始
 
-## 快速开始 (Docker 推荐)
+### 1. 环境要求
 
-1. 进入部署目录并运行部署脚本：
+- Go 1.21+
+- Redis 7.x
+- Docker (可选)
+
+### 2. 端口配置
+
+⚠️ **重要**：系统使用两个不同端口，**不能混用**！
+
+| 端口 | 协议 | 用途 | 访问方式 |
+|------|------|------|----------|
+| **8080** | TCP | 数据服务 | TCP客户端连接 |
+| **8081** | HTTP | Web管理界面 | 浏览器访问 |
+
+浏览器如果访问8080会导致TCP服务器报错（因为收到了HTTP请求而不是JSON数据）。
+
+### 3. 本地运行
+
+```bash
+# 1. 启动Redis
+docker run -d -p 6379:6379 --name redis-goserver redis:7-alpine
+
+# 2. 运行服务
+go run cmd/main.go
+
+# 3. 浏览器访问Web界面（必须是8081端口！）
+http://localhost:8081
+
+# 4. TCP客户端测试（连接8080端口）
+cd test
+go run tcp_client.go -type=single
+
+### 3. Docker部署
 
 ```bash
 cd docker
-# Linux / macOS
-chmod +x deploy.sh && ./deploy.sh
-# Windows
-.\deploy.bat
+./deploy.sh  # Linux/Mac
+# 或
+.\deploy.bat  # Windows
 ```
 
-2. 访问 Web UI： http://localhost:8080
-3. 验证健康： `curl http://localhost:8080/health`
+## 通信协议
 
----
-
-## 本地开发
-
-- 安装依赖： `go mod download`
-- 启动本地 Redis（可选）： `docker run -d -p 6379:6379 redis:7-alpine`
-- 运行： `go run cmd/main.go`
-- 编译： `go build -o goserver ./cmd/main.go`
-- 测试： `go test ./...`
-
----
-
-## 配置（.env）
-
-复制 `.env.example` 为 `.env`，常用变量：
-
-- `SERVER_PORT`（默认 `8080`）
-- `SERVER_MAX_WORKERS`（默认 `100`）
-- `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
-- `BATCH_SIZE`, `WORKERS`, `QUEUE_SIZE`
-
----
-
-## 主要 API 速查
-
-- `GET /health` — 健康检查
-- `GET /api/config` — 获取配置
-- `POST /api/config` — 更新配置
-- `POST /api/process` — 处理单条数据
-- `POST /api/process/batch` — 批量处理
-- `POST /api/process/queue` — 处理队列
-- `GET /api/metrics` — 获取指标
-- `POST /api/metrics/reset` — 重置指标
-- `GET /api/redis/keys` — 列出 Redis 键
-
----
-
-## 项目结构（简要）
-
-```
-.
-├── cmd/              # 应用入口
-├── internal/         # 核心模块 (api, cache, config, processor)
-├── web/              # Web UI 静态文件
-├── docker/           # Docker 构建与部署脚本
-├── .env.example
-└── go.mod / go.sum
+### 请求格式
+```json
+{
+  "id": "请求ID",
+  "cmd": "process|batch|publish|subscribe|metrics",
+  "channel": "队列名",
+  "data": {}
+}
 ```
 
----
+### 命令说明
 
-## 部署与运维要点
+| 命令 | 功能 | 示例 |
+|------|------|------|
+| `process` | 处理单条数据 | `{"cmd":"process","data":{"name":"order"}}` |
+| `batch` | 批量处理 | `{"cmd":"batch","data":[...]}` |
+| `publish` | 发布消息 | `{"cmd":"publish","channel":"news","data":{}}` |
+| `subscribe` | 订阅频道 | `{"cmd":"subscribe","channel":"news"}` |
+| `metrics` | 获取指标 | `{"cmd":"metrics"}` |
+| `ping` | 心跳检测 | `{"cmd":"ping"}` |
 
-- Docker Compose 提供一键部署与日志查看
-- 使用 `.env` 管理运行时参数
-- 生产环境建议使用 HTTPS、设置 Redis 密码、并配置监控和备份
+## 性能测试
 
----
+```bash
+# 压力测试：100连接，每连接1000请求
+cd test
+go run tcp_client.go -type=stress -c 100 -n 1000
 
-## 架构概览
+# 预期结果：
+# QPS: >5000
+# Avg Latency: <50ms
+```
 
-- HTTP 层（Gin）处理请求并调度到内部处理器
-- 数据处理层使用工作线程池与批处理策略
-- Redis 用作队列与缓存，支持快速读写
-- Web UI 提供实时监控、配置与操作界面
+## 配置说明
 
----
+`.env` 文件：
 
-## 检查清单（部署前）
+```bash
+# 服务器
+SERVER_PORT=8080
+SERVER_MAX_WORKERS=100
 
-- [ ] Docker & Docker Compose
-- [ ] `.env` 已配置
-- [ ] 端口 (`SERVER_PORT`) 未被占用
-- [ ] Redis 可用
-- [ ] 日志与监控配置就绪
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
 
----
+# 应用
+WORKERS=10          # Goroutine池大小
+QUEUE_SIZE=1000     # 任务队列长度
+BATCH_SIZE=100      # 批处理大小
+```
 
-## 关于文档合并
+## 项目结构
 
-已将仓库内的 `QUICKSTART.md`、`DEPLOYMENT.md`、`ARCHITECTURE.md`、`CHECKLIST.md`、`PROJECT_SUMMARY.md` 和 `GETTING_STARTED.md` 的内容合并到本 `README.md`。其它 `.md` 文件已替换为指向本文件的占位说明。
+```
+goserver/
+├── cmd/
+│   └── main.go              # 应用入口
+├── internal/
+│   ├── protocol/            # 通信协议
+│   │   └── message.go
+│   ├── network/             # TCP服务器
+│   │   ├── server.go
+│   │   └── connection.go
+│   ├── pool/                # Goroutine池
+│   │   └── worker.go
+│   ├── processor/           # 业务处理器
+│   │   └── processor.go
+│   ├── cache/               # Redis客户端
+│   │   └── redis.go
+│   └── config/              # 配置管理
+│       └── config.go
+├── test/
+│   ├── tcp_client.go        # TCP测试客户端
+│   └── TEST_GUIDE.md        # 测试指南
+├── docker/
+│   ├── docker-compose.yml
+│   └── Dockerfile
+└── README.md
+```
 
----
+## 研究任务完成情况
 
-## 贡献与反馈
+- [x] **任务一**：学习Go并发编程，研究net/tcp标准库
+- [x] **任务二**：设计系统架构（网络层、协议层、业务逻辑层）
+- [x] **任务三**：实现TCP服务器核心功能（连接管理、协议解析、业务处理）
+- [x] **任务四**：Goroutine池优化、心跳检测、连接超时
+- [x] **任务五**：消息队列（发布订阅）、监控统计
+- [x] **任务六**：压力测试工具、性能优化
 
-欢迎提 Issue 或 Pull Request。开发流程建议：
+## 技术亮点
 
-- Fork -> 新建分支 -> 提交 -> 发起 PR
+1. **连接管理**：每个连接独立goroutine，支持10K并发
+2. **Worker Pool**：限制并发处理数，防止资源耗尽
+3. **心跳机制**：30秒间隔检测，90秒超时断开
+4. **协议设计**：JSON格式，易于调试和扩展
+5. **发布订阅**：支持实时消息推送
 
----
+## License
 
 MIT License
-
-
-## Docker命令参考
-
-```bash
-# 查看容器状态
-docker-compose -f docker/docker-compose.yml ps
-
-# 查看应用日志
-docker-compose -f docker/docker-compose.yml logs -f app
-
-# 查看Redis日志
-docker-compose -f docker/docker-compose.yml logs -f redis
-
-# 进入容器
-docker-compose -f docker/docker-compose.yml exec app sh
-
-# 停止服务
-docker-compose -f docker/docker-compose.yml down
-
-# 清理所有容器和镜像
-docker-compose -f docker/docker-compose.yml down -v --rmi all
-```
-
-## 日志
-
-应用日志输出到标准输出，可以通过以下方式查看：
-
-```bash
-# 查看最近100行日志
-docker logs --tail 100 goserver-app
-
-# 实时跟踪日志
-docker logs -f goserver-app
-```
-
-## 安全建议
-
-- 生产环境中修改Redis密码
-- 使用HTTPS而不是HTTP
-- 限制API访问IP范围
-- 定期更新依赖包
-- 启用请求认证
-
-## 故障排查
-
-### Redis连接失败
-```bash
-# 检查Redis是否运行
-docker ps | grep redis
-
-# 检查Redis日志
-docker logs goserver-redis
-
-# 测试Redis连接
-redis-cli -h localhost -p 6379 ping
-```
-
-### 应用启动失败
-```bash
-# 查看应用日志
-docker logs goserver-app
-
-# 检查端口占用
-netstat -an | grep 8080
-```
-
-### 内存使用过高
-- 减少 `POOL_SIZE` 或 `QUEUE_SIZE`
-- 清理长期未使用的Redis键
-- 检查数据处理逻辑是否有内存泄漏
-
-## 下一步改进
-
-- [ ] 添加数据库持久化支持
-- [ ] 实现分布式追踪
-- [ ] 添加认证和授权
-- [ ] 支持Prometheus指标导出
-- [ ] 实现自动扩缩容
-- [ ] 添加数据加密传输
