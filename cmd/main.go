@@ -24,7 +24,7 @@ func main() {
 	if err := redisClient.Ping(); err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
-	log.Println("✓ Redis connection established")
+	log.Println("[OK] Redis connection established")
 
 	// 初始化API服务
 	server := api.NewServer(cfg, redisClient)

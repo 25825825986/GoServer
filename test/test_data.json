@@ -1,0 +1,53 @@
+{
+  "single_data": {
+    "id": "001",
+    "name": "用户登录事件",
+    "timestamp": "2026-03-01T10:30:00Z",
+    "user_id": "user_12345",
+    "ip": "192.168.1.100",
+    "action": "login"
+  },
+  "batch_data": [
+    {
+      "id": "001",
+      "name": "订单创建",
+      "amount": 299.99,
+      "currency": "CNY",
+      "timestamp": "2026-03-01T10:00:00Z"
+    },
+    {
+      "id": "002",
+      "name": "订单支付",
+      "amount": 299.99,
+      "currency": "CNY",
+      "status": "paid",
+      "timestamp": "2026-03-01T10:05:00Z"
+    },
+    {
+      "id": "003",
+      "name": "订单发货",
+      "tracking_no": "SF1234567890",
+      "carrier": "顺丰",
+      "timestamp": "2026-03-01T10:30:00Z"
+    },
+    {
+      "id": "004",
+      "name": "订单完成",
+      "timestamp": "2026-03-01T14:00:00Z"
+    },
+    {
+      "id": "005",
+      "name": "用户退款",
+      "amount": 299.99,
+      "reason": "商品质量问题",
+      "timestamp": "2026-03-01T16:00:00Z"
+    }
+  ],
+  "queue_items": [
+    {"event": "page_view", "url": "/home", "user_id": "u001"},
+    {"event": "click", "element": "buy_button", "user_id": "u001"},
+    {"event": "add_cart", "product_id": "p1001", "user_id": "u001"},
+    {"event": "checkout", "items": 3, "user_id": "u001"},
+    {"event": "payment", "amount": 599.99, "user_id": "u001"}
+  ]
+}

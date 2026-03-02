@@ -6,7 +6,7 @@
 
 ---
 
-## 📌 关键要点
+## 关键要点
 
 - 语言：Go 1.21+
 - 运行方式：Docker / 本地运行
@@ -15,7 +15,7 @@
 
 ---
 
-## 🚀 快速开始 (Docker 推荐)
+## 快速开始 (Docker 推荐)
 
 1. 进入部署目录并运行部署脚本：
 
@@ -24,7 +24,7 @@ cd docker
 # Linux / macOS
 chmod +x deploy.sh && ./deploy.sh
 # Windows
-# deploy.bat
+.\deploy.bat
 ```
 
 2. 访问 Web UI： http://localhost:8080
@@ -32,7 +32,7 @@ chmod +x deploy.sh && ./deploy.sh
 
 ---
 
-## 🛠 本地开发
+## 本地开发
 
 - 安装依赖： `go mod download`
 - 启动本地 Redis（可选）： `docker run -d -p 6379:6379 redis:7-alpine`
@@ -42,7 +42,7 @@ chmod +x deploy.sh && ./deploy.sh
 
 ---
 
-## ⚙️ 配置（.env）
+## 配置（.env）
 
 复制 `.env.example` 为 `.env`，常用变量：
 
@@ -53,7 +53,7 @@ chmod +x deploy.sh && ./deploy.sh
 
 ---
 
-## 🔌 主要 API 速查
+## 主要 API 速查
 
 - `GET /health` — 健康检查
 - `GET /api/config` — 获取配置
@@ -67,7 +67,7 @@ chmod +x deploy.sh && ./deploy.sh
 
 ---
 
-## 📁 项目结构（简要）
+## 项目结构（简要）
 
 ```
 .
@@ -81,7 +81,7 @@ chmod +x deploy.sh && ./deploy.sh
 
 ---
 
-## ✅ 部署与运维要点
+## 部署与运维要点
 
 - Docker Compose 提供一键部署与日志查看
 - 使用 `.env` 管理运行时参数
@@ -89,7 +89,7 @@ chmod +x deploy.sh && ./deploy.sh
 
 ---
 
-## 🧭 架构概览
+## 架构概览
 
 - HTTP 层（Gin）处理请求并调度到内部处理器
 - 数据处理层使用工作线程池与批处理策略
@@ -98,7 +98,7 @@ chmod +x deploy.sh && ./deploy.sh
 
 ---
 
-## 📋 检查清单（部署前）
+## 检查清单（部署前）
 
 - [ ] Docker & Docker Compose
 - [ ] `.env` 已配置
@@ -108,13 +108,13 @@ chmod +x deploy.sh && ./deploy.sh
 
 ---
 
-## 📖 关于文档合并
+## 关于文档合并
 
 已将仓库内的 `QUICKSTART.md`、`DEPLOYMENT.md`、`ARCHITECTURE.md`、`CHECKLIST.md`、`PROJECT_SUMMARY.md` 和 `GETTING_STARTED.md` 的内容合并到本 `README.md`。其它 `.md` 文件已替换为指向本文件的占位说明。
 
 ---
 
-## 📫 贡献与反馈
+## 贡献与反馈
 
 欢迎提 Issue 或 Pull Request。开发流程建议：
 
@@ -125,7 +125,7 @@ chmod +x deploy.sh && ./deploy.sh
 MIT License
 
 
-## 🐳 Docker命令参考
+## Docker命令参考
 
 ```bash
 # 查看容器状态
@@ -147,7 +147,7 @@ docker-compose -f docker/docker-compose.yml down
 docker-compose -f docker/docker-compose.yml down -v --rmi all
 ```
 
-## 📝 日志
+## 日志
 
 应用日志输出到标准输出，可以通过以下方式查看：
 
@@ -159,7 +159,7 @@ docker logs --tail 100 goserver-app
 docker logs -f goserver-app
 ```
 
-## 🔐 安全建议
+## 安全建议
 
 - 生产环境中修改Redis密码
 - 使用HTTPS而不是HTTP
@@ -167,7 +167,7 @@ docker logs -f goserver-app
 - 定期更新依赖包
 - 启用请求认证
 
-## 🐛 故障排查
+## 故障排查
 
 ### Redis连接失败
 ```bash
@@ -195,7 +195,7 @@ netstat -an | grep 8080
 - 清理长期未使用的Redis键
 - 检查数据处理逻辑是否有内存泄漏
 
-## 📈 下一步改进
+## 下一步改进
 
 - [ ] 添加数据库持久化支持
 - [ ] 实现分布式追踪

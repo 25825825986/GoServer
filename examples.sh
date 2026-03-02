@@ -60,5 +60,5 @@ echo ""
 
 echo "=== 示例完成 ==="
 echo ""
-echo "💡 提示：使用 jq 工具可以更好地查看JSON输出"
+echo "[TIP] 提示：使用 jq 工具可以更好地查看JSON输出"
 echo "   安装: brew install jq (Mac) 或 apt-get install jq (Linux)"
