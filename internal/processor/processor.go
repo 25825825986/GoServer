@@ -2,6 +2,7 @@ package processor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -84,9 +85,15 @@ func (dp *DataProcessor) processData(data interface{}) error {
 	ctx, cancel := context.WithTimeout(dp.ctx, 5*time.Second)
 	defer cancel()
 
+	// 将数据序列化为JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal data: %w", err)
+	}
+
 	// 处理逻辑示例：将数据保存到Redis
 	key := fmt.Sprintf("data:%d", time.Now().UnixNano())
-	return dp.redis.Set(ctx, key, data, 24*time.Hour)
+	return dp.redis.Set(ctx, key, string(jsonData), 24*time.Hour)
 }
 
 // ProcessBatch 批量处理数据

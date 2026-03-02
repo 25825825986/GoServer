@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -43,7 +44,19 @@ func (rc *RedisClient) Ping() error {
 
 // Set 设置键值对
 func (rc *RedisClient) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
-	return rc.client.Set(ctx, key, value, expiration).Err()
+	// 自动将非字符串类型序列化为JSON
+	var storeValue interface{}
+	switch v := value.(type) {
+	case string, []byte:
+		storeValue = v
+	default:
+		jsonData, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Errorf("failed to marshal value: %w", err)
+		}
+		storeValue = jsonData
+	}
+	return rc.client.Set(ctx, key, storeValue, expiration).Err()
 }
 
 // Get 获取值
