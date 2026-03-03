@@ -52,8 +52,8 @@ func main() {
 	}
 	log.Printf("[OK] TCP Server started on port %s", tcpPort)
 
-	// 6. 创建并启动HTTP管理服务器
-	httpServer := api.NewHTTPServer(cfg, redisClient, tcpServer)
+	// 6. 创建并启动HTTP管理服务器（传入processor参数）
+	httpServer := api.NewHTTPServer(cfg, redisClient, tcpServer, handler)
 	if err := httpServer.Start(httpPort); err != nil {
 		log.Fatalf("[FATAL] Failed to start HTTP server: %v", err)
 	}

@@ -143,8 +143,10 @@ func (s *HTTPServer) getMetrics(c *gin.Context) {
 
 // resetMetrics 重置指标
 func (s *HTTPServer) resetMetrics(c *gin.Context) {
-	// 重置Worker Pool统计
-	s.tcpServer.ResetStats()
+	// 重置Processor统计
+	if s.processor != nil {
+		s.processor.ResetMetrics()
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "metrics reset"})
 }
 
