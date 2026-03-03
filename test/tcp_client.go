@@ -1,4 +1,4 @@
-// TCP客户端测试工具
+// TCP客户端测试工具 - 日志实时处理系统
 package main
 
 import (
@@ -74,24 +74,30 @@ func (c *Client) Close() {
 	c.conn.Close()
 }
 
-// 单条测试
-func singleTest(addr string) {
+// 单条日志测试
+func singleLogTest(addr string) {
 	client, err := NewClient(addr)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer client.Close()
 
-	fmt.Println("=== Single Data Test ===")
+	fmt.Println("=== Single Log Test ===")
 
-	// 发送单条数据
+	// 发送单条日志
 	resp, err := client.Send(&protocol.Message{
 		ID:  "1",
-		Cmd: protocol.CmdProcess,
+		Cmd: protocol.CmdLog,
 		Data: map[string]interface{}{
-			"id":   "001",
-			"name": "order_create",
-			"amount": 299.99,
+			"timestamp": time.Now().UnixMilli(),
+			"level":     "error",
+			"source":    "api-server",
+			"message":   "数据库连接失败",
+			"tags":      []string{"db", "critical"},
+			"metadata": map[string]interface{}{
+				"error_code": 5001,
+				"retry":      3,
+			},
 		},
 	})
 	if err != nil {
@@ -100,116 +106,123 @@ func singleTest(addr string) {
 	}
 	printResponse(resp)
 
-	// 获取指标
+	// 发送 info 级别日志
 	resp, err = client.Send(&protocol.Message{
 		ID:  "2",
-		Cmd: protocol.CmdGetMetrics,
+		Cmd: protocol.CmdLog,
+		Data: map[string]interface{}{
+			"level":   "info",
+			"source":  "app",
+			"message": "服务启动成功",
+			"tags":    []string{"startup"},
+		},
 	})
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
 	}
 	printResponse(resp)
+
+	fmt.Println("=== Test Completed ===")
 }
 
-// 批量测试
-func batchTest(addr string) {
+// 批量日志测试
+func batchLogTest(addr string) {
 	client, err := NewClient(addr)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer client.Close()
 
-	fmt.Println("=== Batch Data Test ===")
+	fmt.Println("=== Batch Log Test ===")
 
-	data := []interface{}{
-		map[string]interface{}{"id": "1", "name": "item1"},
-		map[string]interface{}{"id": "2", "name": "item2"},
-		map[string]interface{}{"id": "3", "name": "item3"},
-		map[string]interface{}{"id": "4", "name": "item4"},
-		map[string]interface{}{"id": "5", "name": "item5"},
+	logs := []interface{}{
+		map[string]interface{}{
+			"timestamp": time.Now().UnixMilli(),
+			"level":     "debug",
+			"source":    "worker-1",
+			"message":   "处理任务开始",
+		},
+		map[string]interface{}{
+			"level":   "info",
+			"source":  "worker-1",
+			"message": "任务处理完成",
+		},
+		map[string]interface{}{
+			"level":   "warn",
+			"source":  "cache",
+			"message": "缓存命中率低于阈值",
+		},
+		map[string]interface{}{
+			"level":   "error",
+			"source":  "payment",
+			"message": "支付网关返回超时",
+		},
+		map[string]interface{}{
+			"level":   "fatal",
+			"source":  "db",
+			"message": "主数据库连接断开",
+		},
 	}
 
 	resp, err := client.Send(&protocol.Message{
-		ID:   "3",
+		ID:   "batch-1",
 		Cmd:  protocol.CmdBatch,
-		Data: data,
+		Data: logs,
 	})
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
 	}
 	printResponse(resp)
+	fmt.Println("=== Test Completed ===")
 }
 
-// 发布订阅测试
-func pubSubTest(addr string) {
-	// 订阅者
-	subscriber, err := NewClient(addr)
+// 日志查询测试
+func queryLogTest(addr string) {
+	client, err := NewClient(addr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer subscriber.Close()
+	defer client.Close()
 
-	// 订阅频道
-	resp, err := subscriber.Send(&protocol.Message{
-		ID:      "sub1",
-		Cmd:     protocol.CmdSubscribe,
-		Channel: "test_channel",
+	fmt.Println("=== Query Log Test ===")
+
+	// 查询所有日志
+	resp, err := client.Send(&protocol.Message{
+		ID:  "query-1",
+		Cmd: protocol.CmdQuery,
+		Filters: &protocol.LogFilter{
+			Limit: 10,
+		},
 	})
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Error: %v", err)
+		return
 	}
-	fmt.Println("=== Pub/Sub Test ===")
 	printResponse(resp)
 
-	// 启动goroutine接收推送
-	go func() {
-		for {
-			line, err := subscriber.reader.ReadBytes('\n')
-			if err != nil {
-				return
-			}
-			var msg protocol.Response
-			if err := json.Unmarshal(line, &msg); err != nil {
-				continue
-			}
-			fmt.Printf("[Received Push] %+v\n", msg)
-		}
-	}()
-
-	// 发布者
-	publisher, err := NewClient(addr)
+	// 按级别查询
+	resp, err = client.Send(&protocol.Message{
+		ID:  "query-2",
+		Cmd: protocol.CmdQuery,
+		Filters: &protocol.LogFilter{
+			Level: "error",
+			Limit: 10,
+		},
+	})
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Error: %v", err)
+		return
 	}
-	defer publisher.Close()
+	printResponse(resp)
 
-	// 发布消息
-	for i := 1; i <= 3; i++ {
-		resp, err := publisher.Send(&protocol.Message{
-			ID:      fmt.Sprintf("pub%d", i),
-			Cmd:     protocol.CmdPublish,
-			Channel: "test_channel",
-			Data: map[string]interface{}{
-				"message": fmt.Sprintf("Hello %d", i),
-				"time":    time.Now().Format("15:04:05"),
-			},
-		})
-		if err != nil {
-			log.Printf("Publish error: %v", err)
-			continue
-		}
-		printResponse(resp)
-		time.Sleep(500 * time.Millisecond)
-	}
-
-	time.Sleep(1 * time.Second)
+	fmt.Println("=== Test Completed ===")
 }
 
 // 压力测试
-func stressTest(addr string, connections, requests int) {
-	fmt.Printf("=== Stress Test: %d connections, %d requests each ===\n", connections, requests)
+func stressLogTest(addr string, connections, requests int) {
+	fmt.Printf("=== Log Stress Test: %d connections, %d requests each ===\n", connections, requests)
 
 	var wg sync.WaitGroup
 	var successCount int64
@@ -229,7 +242,7 @@ func stressTest(addr string, connections, requests int) {
 		clients[i] = client
 	}
 
-	// 发送请求
+	// 发送日志
 	for i, client := range clients {
 		if client == nil {
 			continue
@@ -239,13 +252,20 @@ func stressTest(addr string, connections, requests int) {
 			defer wg.Done()
 
 			for j := 0; j < requests; j++ {
+				// 随机生成日志级别
+				levels := []string{"debug", "info", "warn", "error"}
+				level := levels[j%4]
+
 				reqStart := time.Now()
 				resp, err := c.Send(&protocol.Message{
 					ID:  fmt.Sprintf("conn%d-req%d", idx, j),
-					Cmd: protocol.CmdProcess,
+					Cmd: protocol.CmdLog,
 					Data: map[string]interface{}{
-						"index": idx*requests + j,
-						"time":  time.Now().UnixNano(),
+						"timestamp": time.Now().UnixMilli(),
+						"level":     level,
+						"source":    fmt.Sprintf("client-%d", idx),
+						"message":   fmt.Sprintf("Test log message %d", idx*requests+j),
+						"tags":      []string{"stress-test"},
 					},
 				})
 				latency := time.Since(reqStart).Milliseconds()
@@ -273,7 +293,10 @@ func stressTest(addr string, connections, requests int) {
 	// 统计
 	total := successCount + failedCount
 	qps := float64(total) / duration.Seconds()
-	avgLatency := float64(totalLatency) / float64(successCount)
+	avgLatency := float64(0)
+	if successCount > 0 {
+		avgLatency = float64(totalLatency) / float64(successCount)
+	}
 
 	fmt.Printf("\n=== Results ===\n")
 	fmt.Printf("Duration:     %v\n", duration)
@@ -284,6 +307,28 @@ func stressTest(addr string, connections, requests int) {
 	fmt.Printf("Avg Latency:  %.2f ms\n", avgLatency)
 }
 
+// 心跳测试
+func pingTest(addr string) {
+	client, err := NewClient(addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	fmt.Println("=== Ping Test ===")
+
+	resp, err := client.Send(&protocol.Message{
+		ID:  "ping-1",
+		Cmd: protocol.CmdPing,
+	})
+	if err != nil {
+		log.Printf("Error: %v", err)
+		return
+	}
+	printResponse(resp)
+	fmt.Println("=== Test Completed ===")
+}
+
 func printResponse(resp *protocol.Response) {
 	data, _ := json.MarshalIndent(resp, "", "  ")
 	fmt.Printf("Response: %s\n\n", data)
@@ -291,23 +336,31 @@ func printResponse(resp *protocol.Response) {
 
 func main() {
 	var (
-		addr       = flag.String("addr", "localhost:8080", "Server address")
-		testType   = flag.String("type", "single", "Test type: single, batch, pubsub, stress")
-		connCount  = flag.Int("c", 100, "Connections for stress test")
-		reqCount   = flag.Int("n", 100, "Requests per connection for stress test")
+		addr      = flag.String("addr", "localhost:8080", "Server address")
+		testType  = flag.String("type", "single", "Test type: single, batch, query, stress, ping")
+		connCount = flag.Int("c", 10, "Connections for stress test")
+		reqCount  = flag.Int("n", 100, "Requests per connection for stress test")
 	)
 	flag.Parse()
 
 	switch *testType {
 	case "single":
-		singleTest(*addr)
+		singleLogTest(*addr)
 	case "batch":
-		batchTest(*addr)
-	case "pubsub":
-		pubSubTest(*addr)
+		batchLogTest(*addr)
+	case "query":
+		queryLogTest(*addr)
 	case "stress":
-		stressTest(*addr, *connCount, *reqCount)
+		stressLogTest(*addr, *connCount, *reqCount)
+	case "ping":
+		pingTest(*addr)
 	default:
-		fmt.Println("Unknown test type. Use: single, batch, pubsub, stress")
+		fmt.Println("Unknown test type. Use: single, batch, query, stress, ping")
+		fmt.Println("\nExamples:")
+		fmt.Println("  go run tcp_client.go -type=single")
+		fmt.Println("  go run tcp_client.go -type=batch")
+		fmt.Println("  go run tcp_client.go -type=query")
+		fmt.Println("  go run tcp_client.go -type=stress -c 100 -n 1000")
+		fmt.Println("  go run tcp_client.go -type=ping")
 	}
 }
