@@ -13,6 +13,7 @@ import (
 	"goserver/internal/cache"
 	"goserver/internal/config"
 	"goserver/internal/network"
+	"goserver/internal/processor"
 )
 
 // HTTPServer HTTP管理服务器
@@ -22,10 +23,11 @@ type HTTPServer struct {
 	config    *config.Config
 	redis     *cache.RedisClient
 	tcpServer *network.TCPServer
+	processor *processor.DataProcessor
 }
 
 // NewHTTPServer 创建HTTP服务器
-func NewHTTPServer(cfg *config.Config, redis *cache.RedisClient, tcpServer *network.TCPServer) *HTTPServer {
+func NewHTTPServer(cfg *config.Config, redis *cache.RedisClient, tcpServer *network.TCPServer, proc *processor.DataProcessor) *HTTPServer {
 	if cfg.App.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -43,6 +45,7 @@ func NewHTTPServer(cfg *config.Config, redis *cache.RedisClient, tcpServer *netw
 		config:    cfg,
 		redis:     redis,
 		tcpServer: tcpServer,
+		processor: proc,
 	}
 
 	s.setupRoutes()
@@ -140,7 +143,8 @@ func (s *HTTPServer) getMetrics(c *gin.Context) {
 
 // resetMetrics 重置指标
 func (s *HTTPServer) resetMetrics(c *gin.Context) {
-	// TODO: 实现重置
+	// 重置Worker Pool统计
+	s.tcpServer.ResetStats()
 	c.JSON(http.StatusOK, gin.H{"message": "metrics reset"})
 }
 

@@ -95,9 +95,9 @@ echo [SUCCESS] 部署成功！
 echo ==========================================
 echo.
 echo  访问地址:
-echo   - Web UI: http://localhost:8080
-echo   - API: http://localhost:8080/api
-echo   - Health: http://localhost:8080/health
+echo   - Web UI: http://localhost:8081
+echo   - TCP Server: localhost:8080
+echo   - Health: http://localhost:8081/health
 echo   - Redis: localhost:6379
 echo.
 echo 常用命令:

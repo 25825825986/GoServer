@@ -74,7 +74,7 @@ docker-up: ## 启动Docker容器
 	@echo "[DOCKER] 启动Docker容器..."
 	@cd $(DOCKER_DIR) && docker-compose up -d
 	@echo "[OK] 容器已启动"
-	@echo "[INFO] 访问: http://localhost:8080"
+	@echo "[INFO] Web UI: http://localhost:8081"
 
 docker-down: ## 停止Docker容器
 	@echo "[STOP] 停止Docker容器..."

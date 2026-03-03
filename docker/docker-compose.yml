@@ -21,7 +21,8 @@ services:
       dockerfile: docker/Dockerfile
     container_name: goserver-app
     ports:
-      - "8080:8080"
+      - "8080:8080"  # TCP数据服务端口
+      - "8081:8081"  # HTTP管理界面端口
     environment:
       - SERVER_PORT=8080
       - REDIS_HOST=redis
@@ -36,7 +37,7 @@ services:
     networks:
       - goserver-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/health"]
       interval: 10s
       timeout: 5s
       retries: 5
