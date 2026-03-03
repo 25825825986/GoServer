@@ -94,6 +94,11 @@ func (rc *RedisClient) LRange(ctx context.Context, key string, start, stop int64
 	return rc.client.LRange(ctx, key, start, stop).Result()
 }
 
+// LTrim 修剪列表
+func (rc *RedisClient) LTrim(ctx context.Context, key string, start, stop int64) error {
+	return rc.client.LTrim(ctx, key, start, stop).Err()
+}
+
 // LLen 获取列表长度
 func (rc *RedisClient) LLen(ctx context.Context, key string) (int64, error) {
 	return rc.client.LLen(ctx, key).Result()

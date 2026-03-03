@@ -10,6 +10,7 @@ import (
 // Config 系统配置结构体
 type Config struct {
 	Server ServerConfig
+	MySQL  MySQLConfig
 	Redis  RedisConfig
 	App    AppConfig
 }
@@ -20,6 +21,17 @@ type ServerConfig struct {
 	ReadTimeout  int
 	WriteTimeout int
 	MaxWorkers   int
+}
+
+// MySQLConfig MySQL数据库配置
+type MySQLConfig struct {
+	Host         string
+	Port         string
+	Database     string
+	User         string
+	Password     string
+	MaxOpenConns int
+	MaxIdleConns int
 }
 
 // RedisConfig Redis连接配置
@@ -53,6 +65,15 @@ func LoadConfig() (*Config, error) {
 			ReadTimeout:  getEnvInt("SERVER_READ_TIMEOUT", 10),
 			WriteTimeout: getEnvInt("SERVER_WRITE_TIMEOUT", 10),
 			MaxWorkers:   getEnvInt("SERVER_MAX_WORKERS", 100),
+		},
+		MySQL: MySQLConfig{
+			Host:         getEnv("MYSQL_HOST", "localhost"),
+			Port:         getEnv("MYSQL_PORT", "3306"),
+			Database:     getEnv("MYSQL_DATABASE", "goserver"),
+			User:         getEnv("MYSQL_USER", "root"),
+			Password:     getEnv("MYSQL_PASSWORD", ""),
+			MaxOpenConns: getEnvInt("MYSQL_MAX_OPEN_CONNS", 25),
+			MaxIdleConns: getEnvInt("MYSQL_MAX_IDLE_CONNS", 10),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "localhost"),

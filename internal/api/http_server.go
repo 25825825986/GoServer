@@ -13,6 +13,7 @@ import (
 
 	"goserver/internal/cache"
 	"goserver/internal/config"
+	"goserver/internal/db"
 	"goserver/internal/network"
 	"goserver/internal/processor"
 	"goserver/internal/protocol"
@@ -23,13 +24,14 @@ type HTTPServer struct {
 	router    *gin.Engine
 	server    *http.Server
 	config    *config.Config
+	mysql     *db.MySQLClient
 	redis     *cache.RedisClient
 	tcpServer *network.TCPServer
 	processor *processor.LogProcessor
 }
 
 // NewHTTPServer 创建HTTP服务器
-func NewHTTPServer(cfg *config.Config, redis *cache.RedisClient, tcpServer *network.TCPServer, proc *processor.LogProcessor) *HTTPServer {
+func NewHTTPServer(cfg *config.Config, mysql *db.MySQLClient, redis *cache.RedisClient, tcpServer *network.TCPServer, proc *processor.LogProcessor) *HTTPServer {
 	if cfg.App.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -45,6 +47,7 @@ func NewHTTPServer(cfg *config.Config, redis *cache.RedisClient, tcpServer *netw
 	s := &HTTPServer{
 		router:    router,
 		config:    cfg,
+		mysql:     mysql,
 		redis:     redis,
 		tcpServer: tcpServer,
 		processor: proc,
@@ -122,6 +125,11 @@ func (s *HTTPServer) healthCheck(c *gin.Context) {
 func (s *HTTPServer) getConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"server": s.config.Server,
+		"mysql": gin.H{
+			"host": s.config.MySQL.Host,
+			"port": s.config.MySQL.Port,
+			"database": s.config.MySQL.Database,
+		},
 		"app":    s.config.App,
 	})
 }
@@ -163,6 +171,11 @@ func (s *HTTPServer) queryLogs(c *gin.Context) {
 		filters.EndTime = parseInt64(end)
 	}
 	
+	// 关键词
+	if keyword := c.Query("keyword"); keyword != "" {
+		filters.Keywords = []string{keyword}
+	}
+	
 	msg := &protocol.Message{
 		ID:      "http-query",
 		Cmd:     protocol.CmdQuery,
@@ -180,32 +193,25 @@ func (s *HTTPServer) getRecentLogs(c *gin.Context) {
 		limit = 500
 	}
 	
-	msg := &protocol.Message{
-		ID:  "http-recent",
-		Cmd: protocol.CmdQuery,
-		Filters: &protocol.LogFilter{
-			Limit: limit,
-		},
+	logs, err := s.processor.GetRecentLogs(limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	
-	resp := s.processor.Handle("http", nil, msg)
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, gin.H{
+		"status": "ok",
+		"data":   logs,
+		"count":  len(logs),
+	})
 }
 
 // getLogStats 获取日志统计
 func (s *HTTPServer) getLogStats(c *gin.Context) {
-	ctx := context.Background()
 	dateStr := time.Now().Format("2006-01-02")
 	
-	// 获取各级别日志数量
-	levels := []string{"debug", "info", "warn", "error", "fatal"}
-	stats := make(map[string]int64)
-	
-	for _, level := range levels {
-		key := fmt.Sprintf("stats:logs:%s:%s", dateStr, level)
-		count, _ := s.redis.GetClient().Get(ctx, key).Int64()
-		stats[level] = count
-	}
+	// 从处理器获取统计
+	stats := s.processor.GetLogStats(dateStr)
 	
 	c.JSON(http.StatusOK, gin.H{
 		"date":  dateStr,
@@ -245,30 +251,13 @@ func (s *HTTPServer) getLevelDistribution(c *gin.Context) {
 
 // clearLogs 清空日志
 func (s *HTTPServer) clearLogs(c *gin.Context) {
-	ctx := context.Background()
-	
-	// 获取所有日志键
-	pattern := "logs:*"
-	keys, err := s.redis.Keys(ctx, pattern)
-	if err != nil {
+	if err := s.processor.ClearAllLogs(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	
-	// 删除所有日志键
-	if len(keys) > 0 {
-		s.redis.Del(ctx, keys...)
-	}
-	
-	// 删除统计键
-	statsKeys, _ := s.redis.Keys(ctx, "stats:logs:*")
-	if len(statsKeys) > 0 {
-		s.redis.Del(ctx, statsKeys...)
-	}
-	
 	c.JSON(http.StatusOK, gin.H{
 		"message": "logs cleared",
-		"deleted": len(keys) + len(statsKeys),
 	})
 }
 
