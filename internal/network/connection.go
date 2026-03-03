@@ -212,6 +212,14 @@ func (c *Connection) GetRemoteAddr() string {
 	return ""
 }
 
+// GetLocalAddr 获取本地地址
+func (c *Connection) GetLocalAddr() string {
+	if c.conn != nil {
+		return c.conn.LocalAddr().String()
+	}
+	return ""
+}
+
 // GetID 获取连接ID（实现protocol.ConnInterface）
 func (c *Connection) GetID() string {
 	return c.ID

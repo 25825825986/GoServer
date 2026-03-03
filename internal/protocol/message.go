@@ -1,4 +1,4 @@
-// Package protocol 定义TCP通信协议
+// Package protocol 定义日志处理系统的TCP通信协议
 package protocol
 
 import (
@@ -10,39 +10,63 @@ import (
 type MessageType string
 
 const (
-	// CmdProcess 处理单条数据
-	CmdProcess MessageType = "process"
-	// CmdBatch 批量处理
+	// CmdLog 提交单条日志
+	CmdLog MessageType = "log"
+	// CmdBatch 批量提交日志
 	CmdBatch MessageType = "batch"
-	// CmdPublish 发布消息到队列
-	CmdPublish MessageType = "publish"
-	// CmdSubscribe 订阅队列
-	CmdSubscribe MessageType = "subscribe"
+	// CmdQuery 查询日志（用于交互式查询）
+	CmdQuery MessageType = "query"
 	// CmdPing 心跳检测
 	CmdPing MessageType = "ping"
-	// CmdPong 心跳响应
-	CmdPong MessageType = "pong"
-	// CmdGetMetrics 获取指标
-	CmdGetMetrics MessageType = "metrics"
-	// CmdGetConfig 获取配置
-	CmdGetConfig MessageType = "config"
 )
+
+// LogLevel 日志级别
+type LogLevel string
+
+const (
+	LevelDebug LogLevel = "debug"
+	LevelInfo  LogLevel = "info"
+	LevelWarn  LogLevel = "warn"
+	LevelError LogLevel = "error"
+	LevelFatal LogLevel = "fatal"
+)
+
+// LogEntry 日志条目结构
+type LogEntry struct {
+	Timestamp int64       `json:"timestamp"`         // 时间戳（毫秒）
+	Level     LogLevel    `json:"level"`             // 日志级别
+	Source    string      `json:"source"`            // 来源（如：服务名/模块名）
+	Message   string      `json:"message"`           // 日志内容
+	Tags      []string    `json:"tags,omitempty"`    // 标签
+	Metadata  interface{} `json:"metadata,omitempty"` // 额外元数据
+}
 
 // Message 请求消息结构
 type Message struct {
-	ID      string      `json:"id"`      // 请求唯一ID
-	Cmd     MessageType `json:"cmd"`     // 命令类型
-	Channel string      `json:"channel"` // 队列/频道名称（可选）
-	Data    interface{} `json:"data"`    // 数据负载
+	ID      string      `json:"id"`                 // 请求唯一ID
+	Cmd     MessageType `json:"cmd"`                // 命令类型
+	Data    interface{} `json:"data"`               // 数据负载（对于log类型，为LogEntry）
+	Filters *LogFilter  `json:"filters,omitempty"`  // 查询过滤器（用于query命令）
+}
+
+// LogFilter 日志查询过滤器
+type LogFilter struct {
+	Level     string   `json:"level,omitempty"`     // 日志级别过滤
+	Source    string   `json:"source,omitempty"`    // 来源过滤
+	StartTime int64    `json:"start_time,omitempty"` // 开始时间戳
+	EndTime   int64    `json:"end_time,omitempty"`   // 结束时间戳
+	Keywords  []string `json:"keywords,omitempty"`   // 关键词过滤
+	Limit     int      `json:"limit,omitempty"`      // 返回数量限制
 }
 
 // Response 响应消息结构
 type Response struct {
-	ID      string      `json:"id"`      // 对应请求ID
-	Status  string      `json:"status"`  // ok 或 error
-	Data    interface{} `json:"data"`    // 响应数据
-	Error   string      `json:"error"`   // 错误信息（如果有）
-	Latency int64       `json:"latency"` // 处理延迟（毫秒）
+	ID      string      `json:"id"`                // 对应请求ID
+	Status  string      `json:"status"`            // ok 或 error
+	Data    interface{} `json:"data,omitempty"`    // 响应数据
+	Error   string      `json:"error,omitempty"`   // 错误信息（如果有）
+	Latency int64       `json:"latency"`           // 处理延迟（毫秒）
+	Count   int         `json:"count,omitempty"`   // 处理数量
 }
 
 // Marshal 序列化消息
@@ -80,12 +104,6 @@ func NewErrorResponse(id string, errMsg string) *Response {
 		Status: "error",
 		Error:  errMsg,
 	}
-}
-
-// Protocol 协议处理器接口
-type Protocol interface {
-	Decode(data []byte) (*Message, error)
-	Encode(resp *Response) ([]byte, error)
 }
 
 // JSONProtocol JSON协议实现

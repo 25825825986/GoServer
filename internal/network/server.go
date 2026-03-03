@@ -236,3 +236,66 @@ func (s *TCPServer) Broadcast(channel string, data interface{}) {
 		go conn.Send(resp)
 	}
 }
+
+// GetConnections 获取所有连接信息
+func (s *TCPServer) GetConnections() []map[string]interface{} {
+	s.connectionsMu.RLock()
+	defer s.connectionsMu.RUnlock()
+	
+	connections := make([]map[string]interface{}, 0, len(s.connections))
+	for id, conn := range s.connections {
+		connections = append(connections, map[string]interface{}{
+			"id":          id,
+			"remote_addr": conn.GetRemoteAddr(),
+			"local_addr":  conn.GetLocalAddr(),
+		})
+	}
+	return connections
+}
+
+// DisconnectConnection 断开指定连接
+func (s *TCPServer) DisconnectConnection(id string) error {
+	s.connectionsMu.RLock()
+	conn, exists := s.connections[id]
+	s.connectionsMu.RUnlock()
+	
+	if !exists {
+		return fmt.Errorf("connection not found: %s", id)
+	}
+	
+	conn.Close()
+	return nil
+}
+
+// DisconnectAll 断开所有连接
+func (s *TCPServer) DisconnectAll() int {
+	s.connectionsMu.RLock()
+	conns := make([]*Connection, 0, len(s.connections))
+	for _, conn := range s.connections {
+		conns = append(conns, conn)
+	}
+	s.connectionsMu.RUnlock()
+	
+	for _, conn := range conns {
+		conn.Close()
+	}
+	
+	return len(conns)
+}
+
+// ReloadWorkerPool 重载Worker池
+func (s *TCPServer) ReloadWorkerPool() {
+	// 停止旧的工作池
+	s.workerPool.Stop()
+	// 创建新的工作池
+	s.workerPool = pool.NewWorkerPool(s.config.App.Workers, s.config.App.QueueSize)
+	s.workerPool.SetHandler(s.handler)
+	s.workerPool.Start()
+	log.Printf("[TCP Server] Worker pool reloaded with %d workers", s.config.App.Workers)
+}
+
+// PauseWorkerPool 暂停Worker池
+func (s *TCPServer) PauseWorkerPool() {
+	s.workerPool.Pause()
+	log.Printf("[TCP Server] Worker pool paused")
+}

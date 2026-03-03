@@ -14,21 +14,22 @@ import (
 )
 
 func main() {
-	log.Println("[START] High Concurrency Data Processing System")
+	log.Println("[START] Log Processing System")
 
 	// 1. 加载配置
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("[FATAL] Failed to load config: %v", err)
 	}
-	// 设置端口：TCP用8080，HTTP用8081（避免冲突）
+	
+	// 设置端口
 	tcpPort := cfg.Server.Port
 	if tcpPort == "" {
 		tcpPort = "8080"
 	}
 	httpPort := "8081"
 	
-	log.Printf("[CONFIG] Loaded: TCP Port=%s, HTTP Port=%s, Workers=%d, QueueSize=%d",
+	log.Printf("[CONFIG] TCP Port=%s, HTTP Port=%s, Workers=%d, QueueSize=%d",
 		tcpPort, httpPort, cfg.App.Workers, cfg.App.QueueSize)
 
 	// 2. 初始化Redis连接
@@ -40,36 +41,38 @@ func main() {
 	}
 	log.Println("[OK] Redis connection established")
 
-	// 3. 创建业务处理器
-	handler := processor.NewDataProcessor(redisClient, cfg)
+	// 3. 创建日志处理器
+	handler := processor.NewLogProcessor(redisClient, cfg)
 
-	// 4. 创建TCP服务器（数据处理）
+	// 4. 创建TCP服务器（接收日志）
 	tcpServer := network.NewTCPServer(cfg, handler)
 
 	// 5. 启动TCP服务器
 	if err := tcpServer.Start(); err != nil {
 		log.Fatalf("[FATAL] Failed to start TCP server: %v", err)
 	}
-	log.Printf("[OK] TCP Server started on port %s", tcpPort)
+	log.Printf("[OK] TCP Log Receiver started on port %s", tcpPort)
 
-	// 6. 创建并启动HTTP管理服务器（传入processor参数）
+	// 6. 创建并启动HTTP管理服务器
 	httpServer := api.NewHTTPServer(cfg, redisClient, tcpServer, handler)
 	if err := httpServer.Start(httpPort); err != nil {
 		log.Fatalf("[FATAL] Failed to start HTTP server: %v", err)
 	}
-	log.Printf("[OK] HTTP Server started on port %s", httpPort)
+	log.Printf("[OK] HTTP Web UI started on port %s", httpPort)
 
 	log.Println("")
 	log.Println("===============================================")
-	log.Println("  Server started successfully!")
+	log.Println("  Log Processing System Started!")
 	log.Println("===============================================")
-	log.Printf("  TCP Data Server:  port %s (for data processing)", tcpPort)
-	log.Printf("  HTTP Web UI:      port %s (for management)", httpPort)
-	log.Printf("  Web Dashboard:    http://localhost:%s", httpPort)
+	log.Printf("  TCP Log Receiver: port %s", tcpPort)
+	log.Printf("  HTTP Web UI:      http://localhost:%s", httpPort)
 	log.Println("===============================================")
 	log.Println("")
-	log.Println("[INFO] Max concurrency: 10000 TCP connections")
-	log.Println("[INFO] Target QPS: 5000+")
+	log.Println("[INFO] Features:")
+	log.Println("       - Real-time log collection via TCP")
+	log.Println("       - High-concurrency log processing")
+	log.Println("       - Redis-based log storage")
+	log.Println("       - Web dashboard for log management")
 	log.Println("")
 
 	// 7. 等待退出信号
@@ -80,17 +83,10 @@ func main() {
 	<-quit
 
 	log.Println("")
-	log.Println("[STOP] Shutting down servers...")
+	log.Println("[STOP] Shutting down...")
 	
-	// 停止HTTP服务器
-	if err := httpServer.Stop(); err != nil {
-		log.Printf("[ERROR] HTTP server stop error: %v", err)
-	}
-	
-	// 停止TCP服务器
-	if err := tcpServer.Stop(); err != nil {
-		log.Printf("[ERROR] TCP server stop error: %v", err)
-	}
+	httpServer.Stop()
+	tcpServer.Stop()
 
-	log.Println("[OK] All servers stopped")
+	log.Println("[OK] Server stopped")
 }

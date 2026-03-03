@@ -1,11 +1,10 @@
-// Package processor 业务处理器 - 支持消息队列发布订阅
+// Package processor 日志处理逻辑
 package processor
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,325 +14,372 @@ import (
 	"goserver/internal/protocol"
 )
 
-// DataProcessor 数据处理器
-type DataProcessor struct {
+// LogProcessor 日志处理器
+type LogProcessor struct {
 	redis      *cache.RedisClient
 	config     *config.Config
 	
-	// 订阅管理
-	subscribers   map[string]map[string]protocol.ConnInterface // channel -> connID -> connection
-	subscribersMu sync.RWMutex
-	
-	// 指标
+	// 指标统计
 	metrics *ProcessorMetrics
 }
 
 // ProcessorMetrics 处理器指标
 type ProcessorMetrics struct {
 	mu              sync.RWMutex
-	ProcessedCount  uint64
-	FailedCount     uint64
-	PublishedCount  uint64
-	SubscribedCount uint64
-	TotalLatency    int64
-	AvgLatency      float64
-	LastProcessTime time.Time
+	LogsReceived    uint64    // 接收的日志数
+	LogsProcessed   uint64    // 处理成功的日志数
+	LogsFailed      uint64    // 处理失败的日志数
+	TotalLatency    int64     // 总延迟（毫秒）
+	AvgLatency      float64   // 平均延迟
+	LastProcessTime time.Time // 最后处理时间
 }
 
-// NewDataProcessor 创建新的数据处理器
-func NewDataProcessor(redis *cache.RedisClient, cfg *config.Config) *DataProcessor {
-	return &DataProcessor{
-		redis:       redis,
-		config:      cfg,
-		subscribers: make(map[string]map[string]protocol.ConnInterface),
-		metrics:     &ProcessorMetrics{},
+// NewLogProcessor 创建日志处理器
+func NewLogProcessor(redis *cache.RedisClient, cfg *config.Config) *LogProcessor {
+	return &LogProcessor{
+		redis:   redis,
+		config:  cfg,
+		metrics: &ProcessorMetrics{},
 	}
 }
 
-// Handle 实现网络处理器接口 - 处理各种命令
-func (dp *DataProcessor) Handle(connID string, conn protocol.ConnInterface, msg *protocol.Message) *protocol.Response {
+// Handle 处理消息（实现protocol.Handler接口）
+func (lp *LogProcessor) Handle(connID string, conn protocol.ConnInterface, msg *protocol.Message) *protocol.Response {
 	start := time.Now()
 	
 	var resp *protocol.Response
 	
 	switch msg.Cmd {
-	case protocol.CmdProcess:
-		resp = dp.handleProcess(msg)
+	case protocol.CmdLog:
+		resp = lp.handleSingleLog(msg)
 	case protocol.CmdBatch:
-		resp = dp.handleBatch(msg)
-	case protocol.CmdPublish:
-		resp = dp.handlePublish(msg)
-	case protocol.CmdSubscribe:
-		resp = dp.handleSubscribe(connID, conn, msg)
-	case protocol.CmdGetMetrics:
-		resp = dp.handleGetMetrics(msg)
-	case protocol.CmdGetConfig:
-		resp = dp.handleGetConfig(msg)
+		resp = lp.handleBatchLogs(msg)
+	case protocol.CmdQuery:
+		resp = lp.handleQuery(msg)
+	case protocol.CmdPing:
+		resp = &protocol.Response{ID: msg.ID, Status: "ok", Data: map[string]string{"type": "pong"}}
 	default:
 		resp = protocol.NewErrorResponse(msg.ID, fmt.Sprintf("unknown command: %s", msg.Cmd))
 	}
-
+	
 	// 更新指标
 	latency := time.Since(start).Milliseconds()
 	resp.Latency = latency
-	dp.updateMetrics(resp.Status == "ok", latency)
-
+	lp.updateMetrics(resp.Status == "ok", latency)
+	
 	return resp
 }
 
-// handleProcess 处理单条数据
-func (dp *DataProcessor) handleProcess(msg *protocol.Message) *protocol.Response {
-	if msg.Data == nil {
-		return protocol.NewErrorResponse(msg.ID, "data is nil")
+// handleSingleLog 处理单条日志
+func (lp *LogProcessor) handleSingleLog(msg *protocol.Message) *protocol.Response {
+	// 解析日志数据
+	logData, err := lp.parseLogEntry(msg.Data)
+	if err != nil {
+		return protocol.NewErrorResponse(msg.ID, fmt.Sprintf("parse log failed: %v", err))
 	}
-
+	
 	// 存储到Redis
-	key := fmt.Sprintf("data:%d", time.Now().UnixNano())
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	jsonData, err := json.Marshal(msg.Data)
-	if err != nil {
-		return protocol.NewErrorResponse(msg.ID, fmt.Sprintf("marshal error: %v", err))
+	if err := lp.storeLog(logData); err != nil {
+		return protocol.NewErrorResponse(msg.ID, fmt.Sprintf("store log failed: %v", err))
 	}
-
-	if err := dp.redis.Set(ctx, key, string(jsonData), 24*time.Hour); err != nil {
-		return protocol.NewErrorResponse(msg.ID, fmt.Sprintf("redis error: %v", err))
-	}
-
+	
 	return protocol.NewResponse(msg.ID, map[string]string{
-		"status": "processed",
-		"key":    key,
+		"status": "stored",
+		"level":  string(logData.Level),
 	})
 }
 
-// handleBatch 批量处理
-func (dp *DataProcessor) handleBatch(msg *protocol.Message) *protocol.Response {
-	dataList, ok := msg.Data.([]interface{})
+// handleBatchLogs 批量处理日志
+func (lp *LogProcessor) handleBatchLogs(msg *protocol.Message) *protocol.Response {
+	batchData, ok := msg.Data.([]interface{})
 	if !ok {
-		return protocol.NewErrorResponse(msg.ID, "data must be an array")
+		return protocol.NewErrorResponse(msg.ID, "invalid batch data format")
 	}
-
+	
 	successCount := 0
-	failedCount := 0
-	keys := make([]string, 0, len(dataList))
-
-	for _, item := range dataList {
-		key := fmt.Sprintf("data:%d", time.Now().UnixNano())
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		
-		jsonData, err := json.Marshal(item)
+	for _, item := range batchData {
+		logData, err := lp.parseLogEntry(item)
 		if err != nil {
-			failedCount++
-			cancel()
 			continue
 		}
-
-		if err := dp.redis.Set(ctx, key, string(jsonData), 24*time.Hour); err != nil {
-			failedCount++
-			cancel()
+		if err := lp.storeLog(logData); err != nil {
 			continue
 		}
-		cancel()
-
 		successCount++
-		keys = append(keys, key)
 	}
-
-	return protocol.NewResponse(msg.ID, map[string]interface{}{
-		"total":         len(dataList),
-		"success_count": successCount,
-		"failed_count":  failedCount,
-		"keys":          keys,
-	})
-}
-
-// handlePublish 发布消息到队列（支持Redis List和普通订阅）
-func (dp *DataProcessor) handlePublish(msg *protocol.Message) *protocol.Response {
-	if msg.Channel == "" {
-		return protocol.NewErrorResponse(msg.ID, "channel is required")
-	}
-
-	// 1. 存储到Redis List（作为消息队列）
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	jsonData, err := json.Marshal(msg.Data)
-	if err != nil {
-		return protocol.NewErrorResponse(msg.ID, fmt.Sprintf("marshal error: %v", err))
-	}
-
-	// 使用 LPUSH 将消息推入队列
-	if _, err := dp.redis.Lpush(ctx, msg.Channel, string(jsonData)); err != nil {
-		return protocol.NewErrorResponse(msg.ID, fmt.Sprintf("redis error: %v", err))
-	}
-
-	// 2. 推送到本地订阅者（发布订阅模式）
-	dp.pushToSubscribers(msg.Channel, msg.Data)
-
-	return protocol.NewResponse(msg.ID, map[string]string{
-		"status":  "published",
-		"channel": msg.Channel,
-	})
-}
-
-// handleSubscribe 订阅频道
-func (dp *DataProcessor) handleSubscribe(connID string, conn protocol.ConnInterface, msg *protocol.Message) *protocol.Response {
-	if msg.Channel == "" {
-		return protocol.NewErrorResponse(msg.ID, "channel is required")
-	}
-
-	dp.subscribersMu.Lock()
-	defer dp.subscribersMu.Unlock()
-
-	if _, ok := dp.subscribers[msg.Channel]; !ok {
-		dp.subscribers[msg.Channel] = make(map[string]protocol.ConnInterface)
-	}
-
-	dp.subscribers[msg.Channel][connID] = conn
-	atomic.AddUint64(&dp.metrics.SubscribedCount, 1)
-
-	log.Printf("[Processor] Connection %s subscribed to channel: %s", connID, msg.Channel)
-
-	return protocol.NewResponse(msg.ID, map[string]string{
-		"status":  "subscribed",
-		"channel": msg.Channel,
-	})
-}
-
-// pushToSubscribers 推送消息到订阅者
-func (dp *DataProcessor) pushToSubscribers(channel string, data interface{}) {
-	dp.subscribersMu.RLock()
-	subs, ok := dp.subscribers[channel]
-	dp.subscribersMu.RUnlock()
-
-	if !ok || len(subs) == 0 {
-		return
-	}
-
-	resp := &protocol.Response{
-		ID:     "pubsub",
+	
+	return &protocol.Response{
+		ID:     msg.ID,
 		Status: "ok",
 		Data: map[string]interface{}{
-			"type":    "message",
-			"channel": channel,
-			"data":    data,
+			"total":   len(batchData),
+			"success": successCount,
+			"failed":  len(batchData) - successCount,
 		},
-	}
-
-	// 异步推送给所有订阅者
-	for connID, conn := range subs {
-		go func(id string, c protocol.ConnInterface) {
-			if err := c.Send(resp); err != nil {
-				log.Printf("[Processor] Push to subscriber %s failed: %v", id, err)
-				// 移除失效订阅
-				dp.removeSubscriber(channel, id)
-			}
-		}(connID, conn)
+		Count: successCount,
 	}
 }
 
-// removeSubscriber 移除订阅者
-func (dp *DataProcessor) removeSubscriber(channel, connID string) {
-	dp.subscribersMu.Lock()
-	defer dp.subscribersMu.Unlock()
+// handleQuery 处理日志查询
+func (lp *LogProcessor) handleQuery(msg *protocol.Message) *protocol.Response {
+	filters := msg.Filters
+	if filters == nil {
+		filters = &protocol.LogFilter{Limit: 100}
+	}
+	if filters.Limit == 0 || filters.Limit > 1000 {
+		filters.Limit = 100
+	}
+	
+	logs, err := lp.queryLogs(filters)
+	if err != nil {
+		return protocol.NewErrorResponse(msg.ID, fmt.Sprintf("query failed: %v", err))
+	}
+	
+	return &protocol.Response{
+		ID:     msg.ID,
+		Status: "ok",
+		Data:   logs,
+		Count:  len(logs),
+	}
+}
 
-	if subs, ok := dp.subscribers[channel]; ok {
-		delete(subs, connID)
-		if len(subs) == 0 {
-			delete(dp.subscribers, channel)
+// parseLogEntry 解析日志条目
+func (lp *LogProcessor) parseLogEntry(data interface{}) (*protocol.LogEntry, error) {
+	if data == nil {
+		return nil, fmt.Errorf("log data is nil")
+	}
+	
+	var entry protocol.LogEntry
+	
+	switch v := data.(type) {
+	case map[string]interface{}:
+		// 填充时间戳
+		if ts, ok := v["timestamp"].(float64); ok {
+			entry.Timestamp = int64(ts)
+		} else {
+			entry.Timestamp = time.Now().UnixMilli()
+		}
+		
+		// 日志级别
+		if level, ok := v["level"].(string); ok {
+			entry.Level = protocol.LogLevel(level)
+		} else {
+			entry.Level = protocol.LevelInfo
+		}
+		
+		// 来源
+		if source, ok := v["source"].(string); ok {
+			entry.Source = source
+		}
+		
+		// 消息内容
+		if msg, ok := v["message"].(string); ok {
+			entry.Message = msg
+		} else {
+			return nil, fmt.Errorf("log message is required")
+		}
+		
+		// 标签
+		if tags, ok := v["tags"].([]interface{}); ok {
+			for _, t := range tags {
+				if tag, ok := t.(string); ok {
+					entry.Tags = append(entry.Tags, tag)
+				}
+			}
+		}
+		
+		// 元数据
+		if meta, ok := v["metadata"]; ok {
+			entry.Metadata = meta
+		}
+		
+	case string:
+		// 简单字符串格式，作为消息内容
+		entry = protocol.LogEntry{
+			Timestamp: time.Now().UnixMilli(),
+			Level:     protocol.LevelInfo,
+			Message:   v,
+		}
+		
+	default:
+		// 尝试JSON序列化再反序列化
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal log data: %v", err)
+		}
+		if err := json.Unmarshal(jsonData, &entry); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal log data: %v", err)
 		}
 	}
+	
+	// 默认填充
+	if entry.Timestamp == 0 {
+		entry.Timestamp = time.Now().UnixMilli()
+	}
+	if entry.Level == "" {
+		entry.Level = protocol.LevelInfo
+	}
+	
+	return &entry, nil
 }
 
-// handleGetMetrics 获取指标
-func (dp *DataProcessor) handleGetMetrics(msg *protocol.Message) *protocol.Response {
-	return protocol.NewResponse(msg.ID, dp.GetMetrics())
+// storeLog 存储日志到Redis
+func (lp *LogProcessor) storeLog(entry *protocol.LogEntry) error {
+	ctx := context.Background()
+	
+	// 生成存储键：按日期和级别分类
+	dateStr := time.UnixMilli(entry.Timestamp).Format("2006-01-02")
+	
+	// 1. 存储到全局日志列表（按时间排序）
+	logJSON, err := json.Marshal(entry)
+	if err != nil {
+		return err
+	}
+	
+	// 使用Redis Stream或List存储
+	key := fmt.Sprintf("logs:%s", dateStr)
+	if _, err := lp.redis.Lpush(ctx, key, string(logJSON)); err != nil {
+		return err
+	}
+	
+	// 2. 按级别索引
+	levelKey := fmt.Sprintf("logs:%s:%s", dateStr, entry.Level)
+	lp.redis.Lpush(ctx, levelKey, string(logJSON))
+	
+	// 3. 按来源索引
+	if entry.Source != "" {
+		sourceKey := fmt.Sprintf("logs:source:%s", entry.Source)
+		lp.redis.Lpush(ctx, sourceKey, string(logJSON))
+	}
+	
+	// 4. 设置过期时间（保留7天）
+	lp.redis.Expire(ctx, key, 7*24*time.Hour)
+	
+	// 5. 更新统计计数器
+	lp.redis.Incr(ctx, fmt.Sprintf("stats:logs:%s:%s", dateStr, entry.Level))
+	
+	return nil
 }
 
-// handleGetConfig 获取配置
-func (dp *DataProcessor) handleGetConfig(msg *protocol.Message) *protocol.Response {
-	return protocol.NewResponse(msg.ID, map[string]interface{}{
-		"server": dp.config.Server,
-		"app":    dp.config.App,
-		"redis": map[string]interface{}{
-			"Host": dp.config.Redis.Host,
-			"Port": dp.config.Redis.Port,
-			"DB":   dp.config.Redis.DB,
-		},
-	})
+// queryLogs 查询日志
+func (lp *LogProcessor) queryLogs(filters *protocol.LogFilter) ([]*protocol.LogEntry, error) {
+	ctx := context.Background()
+	var results []*protocol.LogEntry
+	
+	// 确定查询的键
+	var key string
+	dateStr := time.Now().Format("2006-01-02")
+	
+	if filters.Level != "" {
+		key = fmt.Sprintf("logs:%s:%s", dateStr, filters.Level)
+	} else if filters.Source != "" {
+		key = fmt.Sprintf("logs:source:%s", filters.Source)
+	} else {
+		key = fmt.Sprintf("logs:%s", dateStr)
+	}
+	
+	// 从Redis获取日志
+	logs, err := lp.redis.LRange(ctx, key, 0, int64(filters.Limit-1))
+	if err != nil {
+		return nil, err
+	}
+	
+	for _, logJSON := range logs {
+		var entry protocol.LogEntry
+		if err := json.Unmarshal([]byte(logJSON), &entry); err != nil {
+			continue
+		}
+		
+		// 时间过滤
+		if filters.StartTime > 0 && entry.Timestamp < filters.StartTime {
+			continue
+		}
+		if filters.EndTime > 0 && entry.Timestamp > filters.EndTime {
+			continue
+		}
+		
+		// 关键词过滤
+		if len(filters.Keywords) > 0 {
+			matched := false
+			for _, kw := range filters.Keywords {
+				if contains(entry.Message, kw) || contains(entry.Source, kw) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+		
+		results = append(results, &entry)
+	}
+	
+	return results, nil
 }
 
 // updateMetrics 更新指标
-func (dp *DataProcessor) updateMetrics(success bool, latency int64) {
-	dp.metrics.mu.Lock()
-	defer dp.metrics.mu.Unlock()
-
+func (lp *LogProcessor) updateMetrics(success bool, latency int64) {
+	lp.metrics.mu.Lock()
+	defer lp.metrics.mu.Unlock()
+	
+	atomic.AddUint64(&lp.metrics.LogsReceived, 1)
+	
 	if success {
-		dp.metrics.ProcessedCount++
+		atomic.AddUint64(&lp.metrics.LogsProcessed, 1)
 	} else {
-		dp.metrics.FailedCount++
+		atomic.AddUint64(&lp.metrics.LogsFailed, 1)
 	}
-
-	dp.metrics.TotalLatency += latency
-	if dp.metrics.ProcessedCount > 0 {
-		dp.metrics.AvgLatency = float64(dp.metrics.TotalLatency) / float64(dp.metrics.ProcessedCount)
+	
+	lp.metrics.TotalLatency += latency
+	processed := atomic.LoadUint64(&lp.metrics.LogsProcessed)
+	if processed > 0 {
+		lp.metrics.AvgLatency = float64(lp.metrics.TotalLatency) / float64(processed)
 	}
-	dp.metrics.LastProcessTime = time.Now()
+	lp.metrics.LastProcessTime = time.Now()
 }
 
 // GetMetrics 获取指标
-func (dp *DataProcessor) GetMetrics() map[string]interface{} {
-	dp.metrics.mu.RLock()
-	defer dp.metrics.mu.RUnlock()
-
+func (lp *LogProcessor) GetMetrics() map[string]interface{} {
+	lp.metrics.mu.RLock()
+	defer lp.metrics.mu.RUnlock()
+	
 	return map[string]interface{}{
-		"processed_count":  dp.metrics.ProcessedCount,
-		"failed_count":     dp.metrics.FailedCount,
-		"published_count":  atomic.LoadUint64(&dp.metrics.PublishedCount),
-		"subscribed_count": atomic.LoadUint64(&dp.metrics.SubscribedCount),
-		"avg_latency":      dp.metrics.AvgLatency,
-		"last_process":     dp.metrics.LastProcessTime,
+		"logs_received":   atomic.LoadUint64(&lp.metrics.LogsReceived),
+		"logs_processed":  atomic.LoadUint64(&lp.metrics.LogsProcessed),
+		"logs_failed":     atomic.LoadUint64(&lp.metrics.LogsFailed),
+		"avg_latency_ms":  lp.metrics.AvgLatency,
+		"last_process":    lp.metrics.LastProcessTime,
 	}
 }
 
 // ResetMetrics 重置指标
-func (dp *DataProcessor) ResetMetrics() {
-	dp.metrics.mu.Lock()
-	defer dp.metrics.mu.Unlock()
-
-	dp.metrics.ProcessedCount = 0
-	dp.metrics.FailedCount = 0
-	dp.metrics.PublishedCount = 0
-	dp.metrics.SubscribedCount = 0
-	dp.metrics.TotalLatency = 0
-	dp.metrics.AvgLatency = 0
+func (lp *LogProcessor) ResetMetrics() {
+	lp.metrics.mu.Lock()
+	defer lp.metrics.mu.Unlock()
+	
+	lp.metrics.LogsReceived = 0
+	lp.metrics.LogsProcessed = 0
+	lp.metrics.LogsFailed = 0
+	lp.metrics.TotalLatency = 0
+	lp.metrics.AvgLatency = 0
 }
 
-// ProcessFromQueue 从Redis队列消费消息（用于异步处理）
-func (dp *DataProcessor) ProcessFromQueue(queueKey string, batchSize int) (int, error) {
-	ctx := context.Background()
-	processed := 0
+// GetStats 获取统计（兼容旧接口）
+func (lp *LogProcessor) GetStats() map[string]interface{} {
+	return lp.GetMetrics()
+}
 
-	for i := 0; i < batchSize; i++ {
-		val, err := dp.redis.Rpop(ctx, queueKey)
-		if err != nil {
-			if err.Error() == "redis: nil" {
-				break
-			}
-			return processed, err
+// contains 字符串包含检查
+func contains(s, substr string) bool {
+	return len(substr) == 0 || len(s) >= len(substr) && (s == substr || len(s) > 0 && containsAt(s, substr, 0))
+}
+
+func containsAt(s, substr string, start int) bool {
+	for i := start; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
 		}
-
-		var data interface{}
-		if err := json.Unmarshal([]byte(val), &data); err != nil {
-			log.Printf("[Processor] Unmarshal error: %v", err)
-			continue
-		}
-
-		// 推送到订阅者
-		dp.pushToSubscribers(queueKey, data)
-		processed++
 	}
-
-	return processed, nil
+	return false
 }

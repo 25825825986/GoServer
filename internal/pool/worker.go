@@ -54,6 +54,18 @@ func (w *Worker) run() {
 
 // processTask 处理任务
 func (w *Worker) processTask(task *protocol.Task) {
+	// 检查是否暂停
+	if atomic.LoadInt32(&w.pool.paused) == 1 {
+		// 返回暂停响应
+		resp := &protocol.Response{
+			ID:     task.Message.ID,
+			Status: "error",
+			Error:  "worker pool paused",
+		}
+		task.Conn.Send(resp)
+		return
+	}
+	
 	start := time.Now()
 
 	// 调用处理器
@@ -97,6 +109,9 @@ type WorkerPool struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	wg          sync.WaitGroup
+	
+	// 状态
+	paused     int32
 	
 	// 统计
 	stats       *PoolStats
@@ -208,4 +223,23 @@ func (p *WorkerPool) GetStats() PoolStats {
 		AvgLatency:     atomic.LoadInt64(&p.stats.AvgLatency),
 		QueueLength:    int32(len(p.taskQueue)),
 	}
+}
+
+// Pause 暂停工作池
+func (p *WorkerPool) Pause() {
+	if atomic.CompareAndSwapInt32(&p.paused, 0, 1) {
+		log.Printf("[WorkerPool] Paused")
+	}
+}
+
+// Resume 恢复工作池
+func (p *WorkerPool) Resume() {
+	if atomic.CompareAndSwapInt32(&p.paused, 1, 0) {
+		log.Printf("[WorkerPool] Resumed")
+	}
+}
+
+// IsPaused 检查是否暂停
+func (p *WorkerPool) IsPaused() bool {
+	return atomic.LoadInt32(&p.paused) == 1
 }

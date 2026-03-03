@@ -1,179 +1,141 @@
-# 高并发数据处理系统
+# 日志实时处理系统
 
-基于Go语言的轻量级高并发数据处理系统，支持TCP长连接、消息队列（发布订阅）、批量处理和实时监控。
+一个基于 Go 开发的高并发日志实时收集、处理和存储系统。
 
-## 系统特性
+## 功能特性
 
-- **高并发处理**：单机支持1万+并发TCP连接
-- **高性能**：目标QPS 5000+，平均延迟<50ms
-- **消息队列**：内置发布订阅模式，支持Redis消息队列
-- **连接管理**：心跳检测、连接超时、自动重连
-- **Goroutine池**：可配置的工作协程池，控制并发度
-- **监控统计**：实时性能指标，支持Prometheus格式
-- **协议设计**：JSON通信协议，易于扩展和调试
-
-## 系统架构
-
-```
-客户端(TCP长连接)
-    │
-    ▼
-TCP Server (Go net/tcp)
-    │
-    ▼
-Worker Pool (Goroutine池)
-    │
-    ▼
-Processor (业务处理器)
-    │
-    ├──► Redis (数据存储/消息队列)
-    └──► 订阅推送
-```
+- **实时日志收集**：通过 TCP 端口接收日志数据，支持高并发连接
+- **日志级别分类**：支持 Debug、Info、Warn、Error、Fatal 级别
+- **多维度索引**：按时间、级别、来源自动建立索引
+- **Web 管理界面**：实时查看日志流、统计分析、日志筛选
+- **Redis 持久化**：日志数据存储在 Redis，支持过期清理
 
 ## 快速开始
 
-### 1. 环境要求
-
-- Go 1.21+
-- Redis 7.x
-- Docker (可选)
-
-### 2. 端口配置
-
-⚠️ **重要**：系统使用两个不同端口，**不能混用**！
-
-| 端口 | 协议 | 用途 | 访问方式 |
-|------|------|------|----------|
-| **8080** | TCP | 数据服务 | TCP客户端连接 |
-| **8081** | HTTP | Web管理界面 | 浏览器访问 |
-
-浏览器如果访问8080会导致TCP服务器报错（因为收到了HTTP请求而不是JSON数据）。
-
-### 3. 本地运行
+### 1. 启动 Redis
 
 ```bash
-# 1. 启动Redis
-docker run -d -p 6379:6379 --name redis-goserver redis:7-alpine
-
-# 2. 运行服务
-go run cmd/main.go
-
-# 3. 浏览器访问Web界面（必须是8081端口！）
-http://localhost:8081
-
-# 4. TCP客户端测试（连接8080端口）
-cd test
-go run tcp_client.go -type=single
-
-### 3. Docker部署
-
-```bash
-cd docker
-./deploy.sh  # Linux/Mac
-# 或
-.\deploy.bat  # Windows
+docker run -d -p 6379:6379 --name redis-logs redis:7-alpine
 ```
 
-## 通信协议
+### 2. 启动系统
 
-### 请求格式
+```bash
+go run cmd/main.go
+# 或使用编译好的程序
+./goserver.exe
+```
+
+### 3. 访问 Web 界面
+
+打开浏览器访问：http://localhost:8081
+
+## TCP 日志上报协议
+
+### 单条日志上报
+
 ```json
 {
-  "id": "请求ID",
-  "cmd": "process|batch|publish|subscribe|metrics",
-  "channel": "队列名",
-  "data": {}
+  "id": "log-001",
+  "cmd": "log",
+  "data": {
+    "timestamp": 1709452800000,
+    "level": "error",
+    "source": "api-server",
+    "message": "数据库连接失败",
+    "tags": ["db", "critical"],
+    "metadata": {"error_code": 5001}
+  }
 }
 ```
 
-### 命令说明
+### 批量日志上报
 
-| 命令 | 功能 | 示例 |
+```json
+{
+  "id": "batch-001",
+  "cmd": "batch",
+  "data": [
+    {"level": "info", "source": "app", "message": "服务启动"},
+    {"level": "debug", "source": "app", "message": "配置加载完成"}
+  ]
+}
+```
+
+### 查询日志
+
+```json
+{
+  "id": "query-001",
+  "cmd": "query",
+  "filters": {
+    "level": "error",
+    "source": "api-server",
+    "limit": 50
+  }
+}
+```
+
+## HTTP API 接口
+
+| 接口 | 方法 | 说明 |
 |------|------|------|
-| `process` | 处理单条数据 | `{"cmd":"process","data":{"name":"order"}}` |
-| `batch` | 批量处理 | `{"cmd":"batch","data":[...]}` |
-| `publish` | 发布消息 | `{"cmd":"publish","channel":"news","data":{}}` |
-| `subscribe` | 订阅频道 | `{"cmd":"subscribe","channel":"news"}` |
-| `metrics` | 获取指标 | `{"cmd":"metrics"}` |
-| `ping` | 心跳检测 | `{"cmd":"ping"}` |
-
-## 性能测试
-
-```bash
-# 压力测试：100连接，每连接1000请求
-cd test
-go run tcp_client.go -type=stress -c 100 -n 1000
-
-# 预期结果：
-# QPS: >5000
-# Avg Latency: <50ms
-```
-
-## 配置说明
-
-`.env` 文件：
-
-```bash
-# 服务器
-SERVER_PORT=8080
-SERVER_MAX_WORKERS=100
-
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-
-# 应用
-WORKERS=10          # Goroutine池大小
-QUEUE_SIZE=1000     # 任务队列长度
-BATCH_SIZE=100      # 批处理大小
-```
+| `/api/metrics` | GET | 获取系统指标统计 |
+| `/api/logs` | GET | 查询日志（支持筛选） |
+| `/api/logs/recent` | GET | 获取最近日志 |
+| `/api/logs/stats` | GET | 获取今日日志统计 |
+| `/api/logs/levels` | GET | 获取级别分布 |
+| `/api/logs` | DELETE | 清空所有日志 |
 
 ## 项目结构
 
 ```
-goserver/
 ├── cmd/
-│   └── main.go              # 应用入口
+│   └── main.go              # 程序入口
 ├── internal/
-│   ├── protocol/            # 通信协议
-│   │   └── message.go
-│   ├── network/             # TCP服务器
-│   │   ├── server.go
-│   │   └── connection.go
-│   ├── pool/                # Goroutine池
-│   │   └── worker.go
-│   ├── processor/           # 业务处理器
-│   │   └── processor.go
-│   ├── cache/               # Redis客户端
-│   │   └── redis.go
-│   └── config/              # 配置管理
-│       └── config.go
-├── test/
-│   ├── tcp_client.go        # TCP测试客户端
-│   └── TEST_GUIDE.md        # 测试指南
-├── docker/
-│   ├── docker-compose.yml
-│   └── Dockerfile
-└── README.md
+│   ├── api/                 # HTTP API 服务
+│   ├── cache/               # Redis 客户端
+│   ├── config/              # 配置管理
+│   ├── network/             # TCP 服务器
+│   ├── pool/                # Worker 协程池
+│   ├── processor/           # 日志处理器
+│   └── protocol/            # 通信协议
+├── web/
+│   └── public/
+│       └── index.html       # Web 管理界面
+└── docker/
+    └── docker-compose.yml   # Docker 部署配置
 ```
 
-## 研究任务完成情况
+## 配置说明
 
-- [x] **任务一**：学习Go并发编程，研究net/tcp标准库
-- [x] **任务二**：设计系统架构（网络层、协议层、业务逻辑层）
-- [x] **任务三**：实现TCP服务器核心功能（连接管理、协议解析、业务处理）
-- [x] **任务四**：Goroutine池优化、心跳检测、连接超时
-- [x] **任务五**：消息队列（发布订阅）、监控统计
-- [x] **任务六**：压力测试工具、性能优化
+通过环境变量或 `.env` 文件配置：
 
-## 技术亮点
+```env
+# 服务器配置
+SERVER_PORT=8080          # TCP 日志接收端口
+SERVER_READ_TIMEOUT=10
+SERVER_WRITE_TIMEOUT=10
+SERVER_MAX_WORKERS=100
 
-1. **连接管理**：每个连接独立goroutine，支持10K并发
-2. **Worker Pool**：限制并发处理数，防止资源耗尽
-3. **心跳机制**：30秒间隔检测，90秒超时断开
-4. **协议设计**：JSON格式，易于调试和扩展
-5. **发布订阅**：支持实时消息推送
+# Redis配置
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+
+# Worker配置
+WORKERS=10                # 并发处理Worker数
+QUEUE_SIZE=1000           # 任务队列大小
+```
+
+## 技术栈
+
+- **Go**: 高性能后端服务
+- **Redis**: 日志数据存储和索引
+- **Gin**: HTTP Web 框架
+- **WebSocket**: 实时日志推送（待实现）
 
 ## License
 
-MIT License
+MIT

@@ -1,62 +1,39 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TCP高并发数据处理系统 - 监控面板</title>
+    <title>日志实时处理系统 - 管理控制台</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --primary: #667eea;
-            --primary-dark: #5568d3;
-            --primary-light: #8b5cf6;
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --primary-light: #60a5fa;
             --secondary: #10b981;
             --danger: #ef4444;
             --warning: #f59e0b;
-            --info: #3b82f6;
-            --bg-gradient-start: #667eea;
-            --bg-gradient-end: #764ba2;
-            --card-bg: rgba(255, 255, 255, 0.95);
-            --text-primary: #1f2937;
-            --text-secondary: #6b7280;
-            --border-color: #e5e7eb;
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            --radius-sm: 6px;
-            --radius: 12px;
-            --radius-lg: 16px;
-            --radius-xl: 24px;
-        }
-
-        [data-theme="dark"] {
-            --primary: #8b5cf6;
-            --primary-dark: #7c3aed;
-            --primary-light: #a78bfa;
-            --bg-gradient-start: #1e1b4b;
-            --bg-gradient-end: #312e81;
+            --info: #06b6d4;
+            --bg-gradient-start: #1e3a5f;
+            --bg-gradient-end: #0f172a;
             --card-bg: rgba(30, 41, 59, 0.95);
-            --text-primary: #f3f4f6;
-            --text-secondary: #9ca3af;
-            --border-color: #374151;
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
             --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
-            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+            --radius: 8px;
+            --radius-lg: 12px;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
             min-height: 100vh;
-            padding: 20px;
             color: var(--text-primary);
-            transition: all 0.3s ease;
+            padding: 20px;
         }
 
         .container { max-width: 1400px; margin: 0 auto; }
@@ -64,186 +41,44 @@
         header {
             background: var(--card-bg);
             border-radius: var(--radius-lg);
-            padding: 30px;
-            margin-bottom: 30px;
+            padding: 24px 30px;
+            margin-bottom: 24px;
             box-shadow: var(--shadow-lg);
-            backdrop-filter: blur(10px);
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 20px;
-            animation: slideDown 0.5s ease-out;
-        }
-
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
+            gap: 16px;
         }
 
         .header-left h1 {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 700;
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 8px;
+            color: var(--primary-light);
             display: flex;
             align-items: center;
             gap: 12px;
         }
 
-        .header-left p { color: var(--text-secondary); font-size: 14px; }
+        .header-left p { color: var(--text-secondary); font-size: 14px; margin-top: 4px; }
 
-        .header-right {
+        .server-status {
             display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .server-badge {
-            display: inline-flex;
             align-items: center;
             gap: 8px;
             padding: 8px 16px;
-            background: rgba(102, 126, 234, 0.1);
+            background: rgba(16, 185, 129, 0.1);
             border-radius: 20px;
             font-size: 13px;
-            color: var(--primary);
-            font-weight: 500;
+            color: var(--secondary);
         }
-
-        .theme-toggle {
-            width: 50px;
-            height: 26px;
-            background: var(--border-color);
-            border-radius: 13px;
-            position: relative;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-        }
-
-        .theme-toggle.active { background: var(--primary); }
-        .theme-toggle::after {
-            content: '';
-            position: absolute;
-            width: 22px;
-            height: 22px;
-            background: white;
-            border-radius: 50%;
-            top: 2px;
-            left: 2px;
-            transition: all 0.3s ease;
-            box-shadow: var(--shadow-sm);
-        }
-        .theme-toggle.active::after { left: 26px; }
-
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .card {
-            background: var(--card-bg);
-            border-radius: var(--radius-lg);
-            padding: 24px;
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-            animation: fadeInUp 0.5s ease-out backwards;
-        }
-
-        .card:nth-child(1) { animation-delay: 0.1s; }
-        .card:nth-child(2) { animation-delay: 0.2s; }
-        .card:nth-child(3) { animation-delay: 0.3s; }
-        .card:nth-child(4) { animation-delay: 0.4s; }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-xl); }
-
-        .card-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 20px;
-        }
-
-        .card-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .card-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: var(--radius);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-        }
-
-        .card-icon.primary {
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            color: white;
-        }
-
-        .card-icon.success {
-            background: linear-gradient(135deg, #10b981, #34d399);
-            color: white;
-        }
-
-        .card-icon.warning {
-            background: linear-gradient(135deg, #f59e0b, #fbbf24);
-            color: white;
-        }
-
-        .card-icon.danger {
-            background: linear-gradient(135deg, #ef4444, #f87171);
-            color: white;
-        }
-
-        .status-list { display: flex; flex-direction: column; gap: 12px; }
-
-        .status-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 16px;
-            background: rgba(102, 126, 234, 0.05);
-            border-radius: var(--radius);
-            transition: all 0.3s ease;
-        }
-
-        .status-item:hover {
-            background: rgba(102, 126, 234, 0.1);
-            transform: translateX(4px);
-        }
-
-        .status-left { display: flex; align-items: center; gap: 10px; }
 
         .status-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        .status-dot.online {
             background: var(--secondary);
-            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+            animation: pulse 2s infinite;
         }
 
         @keyframes pulse {
@@ -251,834 +86,657 @@
             50% { opacity: 0.5; }
         }
 
-        .status-label { color: var(--text-secondary); font-size: 14px; }
-        .status-value { color: var(--text-primary); font-weight: 600; font-size: 14px; }
-
-        .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-
-        .metric-box {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(139, 92, 246, 0.1));
-            padding: 20px 15px;
-            border-radius: var(--radius);
-            text-align: center;
-            transition: all 0.3s ease;
-            border: 1px solid rgba(102, 126, 234, 0.1);
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
         }
 
-        .metric-box:hover { transform: scale(1.05); border-color: var(--primary); }
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
 
-        .metric-value {
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .stat-icon.blue { background: rgba(59, 130, 246, 0.2); color: var(--primary); }
+        .stat-icon.green { background: rgba(16, 185, 129, 0.2); color: var(--secondary); }
+        .stat-icon.orange { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .stat-icon.red { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        .stat-value {
             font-size: 28px;
             font-weight: 700;
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 5px;
+            color: var(--text-primary);
         }
 
-        .metric-label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
 
-        .action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        /* Main Layout */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 24px;
+        }
 
-        .action-btn {
-            padding: 12px 16px;
+        /* Sidebar */
+        .sidebar {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            height: fit-content;
+        }
+
+        .sidebar-section {
+            margin-bottom: 24px;
+        }
+
+        .sidebar-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .filter-group { margin-bottom: 16px; }
+
+        .filter-label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .filter-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: rgba(15, 23, 42, 0.5);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
             border: none;
             border-radius: var(--radius);
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
         }
 
-        .action-btn:hover { transform: translateY(-2px); }
-
-        .action-btn.primary {
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+        .btn-primary {
+            background: var(--primary);
             color: white;
-            grid-column: span 2;
         }
+        .btn-primary:hover { background: var(--primary-dark); }
 
-        .action-btn.primary:hover { box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4); }
-
-        .action-btn.secondary {
-            background: rgba(102, 126, 234, 0.1);
-            color: var(--primary);
+        .btn-secondary {
+            background: var(--border-color);
+            color: var(--text-primary);
         }
+        .btn-secondary:hover { background: #475569; }
 
-        .action-btn.secondary:hover { background: rgba(102, 126, 234, 0.2); }
-
-        .chart-container { height: 200px; position: relative; }
-
-        .main-card {
-            background: var(--card-bg);
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(10px);
-            overflow: hidden;
-            animation: fadeInUp 0.5s ease-out 0.5s backwards;
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
         }
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.3); }
 
-        .tab-nav {
+        /* Level Stats */
+        .level-stats {
             display: flex;
-            border-bottom: 1px solid var(--border-color);
-            background: rgba(102, 126, 234, 0.03);
-            overflow-x: auto;
-            scrollbar-width: none;
-        }
-
-        .tab-nav::-webkit-scrollbar { display: none; }
-
-        .tab-btn {
-            padding: 16px 24px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: var(--text-secondary);
-            font-weight: 500;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            position: relative;
-            white-space: nowrap;
-            display: flex;
-            align-items: center;
+            flex-direction: column;
             gap: 8px;
         }
 
-        .tab-btn:hover { color: var(--primary); }
-
-        .tab-btn.active {
-            color: var(--primary);
-            background: rgba(102, 126, 234, 0.08);
-        }
-
-        .tab-btn.active::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, var(--primary), var(--primary-light));
-            border-radius: 3px 3px 0 0;
-        }
-
-        .tab-content { display: none; padding: 30px; animation: fadeIn 0.3s ease-out; }
-        .tab-content.active { display: block; }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .info-section { max-width: 800px; }
-
-        .info-header {
-            margin-bottom: 24px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .info-header h2 {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text-primary);
-        }
-
-        .info-header p { color: var(--text-secondary); font-size: 14px; }
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .info-item {
-            background: rgba(102, 126, 234, 0.03);
-            padding: 16px;
+        .level-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
             border-radius: var(--radius);
-            border: 1px solid var(--border-color);
+            background: rgba(15, 23, 42, 0.5);
         }
 
-        .info-label {
+        .level-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .level-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .level-count {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        /* Main Content */
+        .main-content {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .content-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .content-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .content-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .icon-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: var(--radius);
+            background: var(--border-color);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover { background: #475569; }
+
+        /* Log List */
+        .log-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .log-item {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.2s;
+        }
+
+        .log-item:hover { background: rgba(59, 130, 246, 0.05); }
+
+        .log-item:last-child { border-bottom: none; }
+
+        .log-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .log-level {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .level-debug { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+        .level-info { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .level-warn { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .level-error { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+        .level-fatal { background: rgba(220, 38, 38, 0.3); color: #fca5a5; }
+
+        .log-time {
             font-size: 12px;
             color: var(--text-secondary);
-            margin-bottom: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
 
-        .info-value {
-            font-size: 16px;
-            font-weight: 600;
+        .log-source {
+            font-size: 12px;
+            color: var(--primary-light);
+            margin-left: auto;
+            padding: 2px 8px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 4px;
+        }
+
+        .log-message {
+            font-size: 14px;
             color: var(--text-primary);
-            font-family: 'Fira Code', monospace;
+            line-height: 1.5;
+            word-break: break-word;
         }
 
-        .code-block {
-            background: #1e1e2e;
-            border-radius: var(--radius);
-            padding: 20px;
-            overflow-x: auto;
-            margin: 20px 0;
+        .log-tags {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
         }
 
-        .code-block pre {
-            color: #cdd6f4;
-            font-family: 'Fira Code', monospace;
-            font-size: 13px;
-            line-height: 1.6;
-            margin: 0;
+        .log-tag {
+            font-size: 11px;
+            padding: 2px 8px;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 4px;
+            color: var(--text-secondary);
         }
 
-        .code-block .comment { color: #6c7086; }
-        .code-block .string { color: #a6e3a1; }
-        .code-block .keyword { color: #cba6f7; }
-        .code-block .number { color: #fab387; }
-
-        footer {
+        /* Empty State */
+        .empty-state {
+            padding: 60px 20px;
             text-align: center;
-            color: rgba(255, 255, 255, 0.8);
-            margin-top: 40px;
-            padding: 20px;
-            font-size: 13px;
+            color: var(--text-secondary);
         }
 
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Toast */
         .toast-container {
             position: fixed;
             top: 20px;
             right: 20px;
-            z-index: 1001;
+            z-index: 1000;
             display: flex;
             flex-direction: column;
             gap: 10px;
         }
 
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
+        .toast {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            box-shadow: var(--shadow-lg);
             display: flex;
             align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
+            gap: 12px;
+            min-width: 300px;
+            animation: slideIn 0.3s ease-out;
+            border: 1px solid var(--border-color);
         }
 
-        .loading-overlay.active { opacity: 1; visibility: visible; }
-
-        .loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
         }
 
-        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 968px) {
+            .main-layout { grid-template-columns: 1fr; }
+        }
 
-        @media (max-width: 768px) {
+        @media (max-width: 600px) {
             body { padding: 12px; }
-            header { padding: 20px; flex-direction: column; text-align: center; }
-            .header-left h1 { font-size: 22px; justify-content: center; }
-            .dashboard-grid { grid-template-columns: 1fr; }
-            .metrics-grid { grid-template-columns: repeat(2, 1fr); }
-            .tab-content { padding: 20px; }
+            header { padding: 16px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
-
 <body>
     <div class="container">
-        <!-- Header -->
         <header>
             <div class="header-left">
-                <h1><i class="fas fa-network-wired"></i> TCP高并发数据处理系统</h1>
-                <p>实时监控面板 - 支持1万并发连接 / 目标QPS 5000+</p>
+                <h1><i class="fas fa-file-alt"></i> 日志实时处理系统</h1>
+                <p>Real-time Log Processing & Management Console</p>
             </div>
-            <div class="header-right">
-                <span class="server-badge">
-                    <i class="fas fa-plug"></i>
-                    <span id="tcp-port">TCP Port: 8080</span>
-                </span>
-                <button class="theme-toggle" onclick="toggleTheme()" title="切换主题"></button>
+            <div class="server-status">
+                <div class="status-dot"></div>
+                <span id="system-status">系统运行中</span>
             </div>
         </header>
 
-        <!-- Dashboard Grid -->
-        <div class="dashboard-grid">
-            <!-- TCP Server Status -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <div class="card-icon primary"><i class="fas fa-server"></i></div>
-                        TCP服务器状态
-                    </div>
-                </div>
-                <div class="status-list">
-                    <div class="status-item">
-                        <div class="status-left">
-                            <div class="status-dot online"></div>
-                            <span class="status-label">服务状态</span>
-                        </div>
-                        <span class="status-value" style="color: var(--secondary);">运行中</span>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-left">
-                            <div class="status-dot online"></div>
-                            <span class="status-label">活跃连接</span>
-                        </div>
-                        <span class="status-value" id="active-connections">0</span>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-left">
-                            <div class="status-dot" style="background: var(--info); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);"></div>
-                            <span class="status-label">总连接数</span>
-                        </div>
-                        <span class="status-value" id="total-connections">0</span>
-                    </div>
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon blue"><i class="fas fa-inbox"></i></div>
+                <div>
+                    <div class="stat-value" id="stat-received">0</div>
+                    <div class="stat-label">今日接收</div>
                 </div>
             </div>
-
-            <!-- Worker Pool Metrics -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <div class="card-icon success"><i class="fas fa-cogs"></i></div>
-                        Worker Pool
-                    </div>
-                </div>
-                <div class="metrics-grid">
-                    <div class="metric-box">
-                        <div class="metric-value" id="tasks-processed">0</div>
-                        <div class="metric-label">已处理任务</div>
-                    </div>
-                    <div class="metric-box">
-                        <div class="metric-value" id="tasks-failed">0</div>
-                        <div class="metric-label">失败任务</div>
-                    </div>
-                    <div class="metric-box">
-                        <div class="metric-value" id="avg-latency">0ms</div>
-                        <div class="metric-label">平均延迟</div>
-                    </div>
-                    <div class="metric-box">
-                        <div class="metric-value" id="queue-length">0</div>
-                        <div class="metric-label">队列长度</div>
-                    </div>
+            <div class="stat-card">
+                <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+                <div>
+                    <div class="stat-value" id="stat-processed">0</div>
+                    <div class="stat-label">处理成功</div>
                 </div>
             </div>
-
-            <!-- Quick Actions -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <div class="card-icon warning"><i class="fas fa-bolt"></i></div>
-                        快速操作
-                    </div>
-                </div>
-                <div class="action-grid">
-                    <button class="action-btn primary" onclick="refreshMetrics()">
-                        <i class="fas fa-sync-alt"></i> 刷新指标
-                    </button>
-                    <button class="action-btn secondary" onclick="resetMetrics()">
-                        <i class="fas fa-redo"></i> 重置指标
-                    </button>
-                    <button class="action-btn secondary" onclick="clearRedisKeys()">
-                        <i class="fas fa-trash-alt"></i> 清空Redis
-                    </button>
+            <div class="stat-card">
+                <div class="stat-icon orange"><i class="fas fa-exclamation-triangle"></i></div>
+                <div>
+                    <div class="stat-value" id="stat-errors">0</div>
+                    <div class="stat-label">处理失败</div>
                 </div>
             </div>
-
-            <!-- Performance Chart -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <div class="card-icon danger"><i class="fas fa-chart-area"></i></div>
-                        连接数趋势
-                    </div>
-                </div>
-                <div class="chart-container">
-                    <canvas id="connectionChart"></canvas>
+            <div class="stat-card">
+                <div class="stat-icon red"><i class="fas fa-bolt"></i></div>
+                <div>
+                    <div class="stat-value" id="stat-connections">0</div>
+                    <div class="stat-label">活跃连接</div>
                 </div>
             </div>
         </div>
 
-        <!-- Main Info Card -->
-        <div class="main-card">
-            <!-- Tab Navigation -->
-            <div class="tab-nav">
-                <button class="tab-btn active" onclick="switchTab('system-info', this)">
-                    <i class="fas fa-info-circle"></i> 系统信息
-                </button>
-                <button class="tab-btn" onclick="switchTab('protocol-doc', this)">
-                    <i class="fas fa-book"></i> 协议文档
-                </button>
-                <button class="tab-btn" onclick="switchTab('redis-mgmt', this)">
-                    <i class="fas fa-database"></i> Redis管理
-                </button>
-                <button class="tab-btn" onclick="switchTab('test-tools', this)">
-                    <i class="fas fa-vial"></i> 测试工具
-                </button>
-            </div>
-
-            <!-- System Info Tab -->
-            <div id="system-info" class="tab-content active">
-                <div class="info-section">
-                    <div class="info-header">
-                        <h2><i class="fas fa-server"></i> 系统架构</h2>
-                        <p>TCP高并发数据处理系统采用分层架构设计</p>
+        <!-- Main Layout -->
+        <div class="main-layout">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-title">日志筛选</div>
+                    <div class="filter-group">
+                        <label class="filter-label">日志级别</label>
+                        <select class="filter-input" id="filter-level">
+                            <option value="">全部级别</option>
+                            <option value="debug">Debug</option>
+                            <option value="info">Info</option>
+                            <option value="warn">Warning</option>
+                            <option value="error">Error</option>
+                            <option value="fatal">Fatal</option>
+                        </select>
                     </div>
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <div class="info-label">TCP服务端口</div>
-                            <div class="info-value" id="config-tcp-port">8080</div>
+                    <div class="filter-group">
+                        <label class="filter-label">来源</label>
+                        <input type="text" class="filter-input" id="filter-source" placeholder="如: api-server">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">关键词</label>
+                        <input type="text" class="filter-input" id="filter-keyword" placeholder="搜索内容...">
+                    </div>
+                    <button class="btn btn-primary" onclick="applyFilters()">
+                        <i class="fas fa-search"></i> 筛选日志
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetFilters()" style="margin-top: 8px;">
+                        <i class="fas fa-undo"></i> 重置
+                    </button>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-title">今日统计</div>
+                    <div class="level-stats" id="level-stats">
+                        <div class="level-item">
+                            <span class="level-name"><span class="level-dot" style="background: #94a3b8;"></span> Debug</span>
+                            <span class="level-count" id="count-debug">0</span>
                         </div>
-                        <div class="info-item">
-                            <div class="info-label">HTTP管理端口</div>
-                            <div class="info-value">8080</div>
+                        <div class="level-item">
+                            <span class="level-name"><span class="level-dot" style="background: #60a5fa;"></span> Info</span>
+                            <span class="level-count" id="count-info">0</span>
                         </div>
-                        <div class="info-item">
-                            <div class="info-label">Worker数量</div>
-                            <div class="info-value" id="config-workers">10</div>
+                        <div class="level-item">
+                            <span class="level-name"><span class="level-dot" style="background: #fbbf24;"></span> Warning</span>
+                            <span class="level-count" id="count-warn">0</span>
                         </div>
-                        <div class="info-item">
-                            <div class="info-label">队列大小</div>
-                            <div class="info-value" id="config-queue">1000</div>
+                        <div class="level-item">
+                            <span class="level-name"><span class="level-dot" style="background: #f87171;"></span> Error</span>
+                            <span class="level-count" id="count-error">0</span>
                         </div>
-                        <div class="info-item">
-                            <div class="info-label">最大并发连接</div>
-                            <div class="info-value">10000</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">目标QPS</div>
-                            <div class="info-value">5000+</div>
+                        <div class="level-item">
+                            <span class="level-name"><span class="level-dot" style="background: #fca5a5;"></span> Fatal</span>
+                            <span class="level-count" id="count-fatal">0</span>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Protocol Doc Tab -->
-            <div id="protocol-doc" class="tab-content">
-                <div class="info-section">
-                    <div class="info-header">
-                        <h2><i class="fas fa-exchange-alt"></i> TCP通信协议</h2>
-                        <p>系统使用JSON格式的TCP协议进行通信，每个消息以换行符结束</p>
-                    </div>
-                    
-                    <h3 style="margin: 20px 0 10px; font-size: 16px; color: var(--text-primary);">1. 处理单条数据 (process)</h3>
-                    <div class="code-block">
-                        <pre><span class="comment">// 请求</span>
-{<span class="string">"id"</span>: <span class="string">"1"</span>, <span class="string">"cmd"</span>: <span class="string">"process"</span>, <span class="string">"data"</span>: {<span class="string">"name"</span>: <span class="string">"order"</span>, <span class="string">"amount"</span>: <span class="number">299.99</span>}}
-
-<span class="comment">// 响应</span>
-{<span class="string">"id"</span>: <span class="string">"1"</span>, <span class="string">"status"</span>: <span class="string">"ok"</span>, <span class="string">"data"</span>: {<span class="string">"status"</span>: <span class="string">"processed"</span>}, <span class="string">"latency"</span>: <span class="number">5</span>}</pre>
-                    </div>
-
-                    <h3 style="margin: 20px 0 10px; font-size: 16px; color: var(--text-primary);">2. 批量处理 (batch)</h3>
-                    <div class="code-block">
-                        <pre><span class="comment">// 请求</span>
-{<span class="string">"id"</span>: <span class="string">"2"</span>, <span class="string">"cmd"</span>: <span class="string">"batch"</span>, <span class="string">"data"</span>: [{<span class="string">"id"</span>: <span class="number">1</span>}, {<span class="string">"id"</span>: <span class="number">2</span>}, {<span class="string">"id"</span>: <span class="number">3</span>}]}
-
-<span class="comment">// 响应</span>
-{<span class="string">"id"</span>: <span class="string">"2"</span>, <span class="string">"status"</span>: <span class="string">"ok"</span>, <span class="string">"data"</span>: {<span class="string">"total"</span>: <span class="number">3</span>, <span class="string">"success_count"</span>: <span class="number">3</span>}}</pre>
-                    </div>
-
-                    <h3 style="margin: 20px 0 10px; font-size: 16px; color: var(--text-primary);">3. 发布订阅 (publish/subscribe)</h3>
-                    <div class="code-block">
-                        <pre><span class="comment">// 订阅频道</span>
-{<span class="string">"id"</span>: <span class="string">"3"</span>, <span class="string">"cmd"</span>: <span class="string">"subscribe"</span>, <span class="string">"channel"</span>: <span class="string">"news"</span>}
-
-<span class="comment">// 发布消息</span>
-{<span class="string">"id"</span>: <span class="string">"4"</span>, <span class="string">"cmd"</span>: <span class="string">"publish"</span>, <span class="string">"channel"</span>: <span class="string">"news"</span>, <span class="string">"data"</span>: {<span class="string">"title"</span>: <span class="string">"Hello"</span>}}
-
-<span class="comment">// 订阅者收到的推送</span>
-{<span class="string">"id"</span>: <span class="string">"pubsub"</span>, <span class="string">"status"</span>: <span class="string">"ok"</span>, <span class="string">"data"</span>: {<span class="string">"channel"</span>: <span class="string">"news"</span>, <span class="string">"data"</span>: {...}}}</pre>
-                    </div>
-
-                    <h3 style="margin: 20px 0 10px; font-size: 16px; color: var(--text-primary);">4. 心跳检测 (ping)</h3>
-                    <div class="code-block">
-                        <pre><span class="comment">// 客户端发送心跳（每30秒）</span>
-{<span class="string">"id"</span>: <span class="string">"5"</span>, <span class="string">"cmd"</span>: <span class="string">"ping"</span>}
-
-<span class="comment">// 服务器响应</span>
-{<span class="string">"id"</span>: <span class="string">"5"</span>, <span class="string">"status"</span>: <span class="string">"ok"</span>, <span class="string">"data"</span>: {<span class="string">"type"</span>: <span class="string">"pong"</span>}}</pre>
-                    </div>
-
-                    <h3 style="margin: 20px 0 10px; font-size: 16px; color: var(--text-primary);">5. 获取指标 (metrics)</h3>
-                    <div class="code-block">
-                        <pre><span class="comment">// 请求</span>
-{<span class="string">"id"</span>: <span class="string">"6"</span>, <span class="string">"cmd"</span>: <span class="string">"metrics"</span>}
-
-<span class="comment">// 响应</span>
-{<span class="string">"id"</span>: <span class="string">"6"</span>, <span class="string">"status"</span>: <span class="string">"ok"</span>, <span class="string">"data"</span>: {
-  <span class="string">"processed_count"</span>: <span class="number">1000</span>,
-  <span class="string">"failed_count"</span>: <span class="number">0</span>,
-  <span class="string">"avg_latency"</span>: <span class="number">3.5</span>
-}}</pre>
-                    </div>
+                <div class="sidebar-section">
+                    <button class="btn btn-danger" onclick="clearAllLogs()">
+                        <i class="fas fa-trash"></i> 清空所有日志
+                    </button>
                 </div>
             </div>
 
-            <!-- Redis Management Tab -->
-            <div id="redis-mgmt" class="tab-content">
-                <div class="info-section">
-                    <div class="info-header">
-                        <h2><i class="fas fa-database"></i> Redis数据管理</h2>
-                        <p>查看和管理存储在Redis中的数据</p>
+            <!-- Main Content -->
+            <div class="main-content">
+                <div class="content-header">
+                    <div class="content-title">
+                        <i class="fas fa-list"></i> 实时日志流
                     </div>
-                    <div class="action-grid" style="max-width: 400px; margin-bottom: 20px;">
-                        <button class="action-btn primary" onclick="loadRedisKeys()">
-                            <i class="fas fa-sync-alt"></i> 刷新键列表
+                    <div class="content-actions">
+                        <button class="icon-btn" onclick="toggleAutoRefresh()" title="自动刷新">
+                            <i class="fas fa-sync-alt" id="refresh-icon"></i>
+                        </button>
+                        <button class="icon-btn" onclick="loadLogs()" title="刷新">
+                            <i class="fas fa-redo"></i>
                         </button>
                     </div>
-                    <div id="redis-keys-container" style="margin-top: 20px;">
-                        <p style="color: var(--text-secondary);">点击上方按钮加载Redis键...</p>
-                    </div>
                 </div>
-            </div>
-
-            <!-- Test Tools Tab -->
-            <div id="test-tools" class="tab-content">
-                <div class="info-section">
-                    <div class="info-header">
-                        <h2><i class="fas fa-vial"></i> 测试工具</h2>
-                        <p>使用以下命令测试TCP服务器</p>
-                    </div>
-
-                    <h3 style="margin: 20px 0 10px; font-size: 16px; color: var(--text-primary);">1. 使用Telnet测试</h3>
-                    <div class="code-block">
-                        <pre><span class="comment"># 连接服务器</span>
-$ telnet localhost 8080
-
-<span class="comment"># 发送测试数据</span>
-{<span class="string">"id"</span>:<span class="string">"1"</span>,<span class="string">"cmd"</span>:<span class="string">"process"</span>,<span class="string">"data"</span>:{<span class="string">"test"</span>:<span class="string">"value"</span>}}
-
-<span class="comment"># 发送心跳</span>
-{<span class="string">"id"</span>:<span class="string">"2"</span>,<span class="string">"cmd"</span>:<span class="string">"ping"</span>}</pre>
-                    </div>
-
-                    <h3 style="margin: 20px 0 10px; font-size: 16px; color: var(--text-primary);">2. 使用测试客户端</h3>
-                    <div class="code-block">
-                        <pre><span class="comment"># 进入测试目录</span>
-$ cd test
-
-<span class="comment"># 单条测试</span>
-$ go run tcp_client.go -type=single
-
-<span class="comment"># 批量测试</span>
-$ go run tcp_client.go -type=batch
-
-<span class="comment"># 发布订阅测试</span>
-$ go run tcp_client.go -type=pubsub
-
-<span class="comment"># 压力测试（100连接 x 1000请求）</span>
-$ go run tcp_client.go -type=stress -c 100 -n 1000</pre>
-                    </div>
-
-                    <h3 style="margin: 20px 0 10px; font-size: 16px; color: var(--text-primary);">3. 使用nc命令</h3>
-                    <div class="code-block">
-                        <pre><span class="comment"># 发送单条数据</span>
-$ echo '{"id":"1","cmd":"process","data":{"name":"test"}}' | nc localhost 8080</pre>
+                <div class="log-list" id="log-list">
+                    <div class="empty-state">
+                        <i class="fas fa-file-alt"></i>
+                        <p>暂无日志数据</p>
+                        <p style="font-size: 13px; margin-top: 8px;">等待日志接收...</p>
                     </div>
                 </div>
             </div>
         </div>
-
-        <footer>
-            <p><i class="fas fa-code"></i> TCP High Concurrency Data Processing System | Built with Go</p>
-        </footer>
     </div>
 
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loading-overlay">
-        <div class="loading-spinner"></div>
-    </div>
-
     <script>
-        // Global variables
         const API_BASE = 'http://localhost:8081/api';
-        let connectionChart = null;
-        let connectionHistory = {
-            labels: [],
-            active: [],
-            total: []
-        };
+        let autoRefresh = true;
+        let refreshInterval = null;
 
-        // Theme toggle
-        function toggleTheme() {
-            const body = document.body;
-            const toggle = document.querySelector('.theme-toggle');
-            const currentTheme = body.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            
-            body.setAttribute('data-theme', newTheme);
-            toggle.classList.toggle('active');
-            localStorage.setItem('theme', newTheme);
-            
-            if (connectionChart) {
-                updateChartColors();
-            }
-        }
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadLogs();
+            startAutoRefresh();
+        });
 
-        // Initialize theme
-        function initTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.body.setAttribute('data-theme', savedTheme);
-            if (savedTheme === 'dark') {
-                document.querySelector('.theme-toggle').classList.add('active');
-            }
-        }
-
-        // Initialize chart
-        function initChart() {
-            const ctx = document.getElementById('connectionChart').getContext('2d');
-            const isDark = document.body.getAttribute('data-theme') === 'dark';
-            const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
-            const textColor = isDark ? '#9ca3af' : '#6b7280';
-            
-            connectionChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: connectionHistory.labels,
-                    datasets: [
-                        {
-                            label: '活跃连接',
-                            data: connectionHistory.active,
-                            borderColor: '#667eea',
-                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                            tension: 0.4,
-                            fill: true
-                        },
-                        {
-                            label: '总连接',
-                            data: connectionHistory.total,
-                            borderColor: '#10b981',
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            tension: 0.4,
-                            fill: true
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                usePointStyle: true,
-                                padding: 15,
-                                color: textColor
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: { color: gridColor, drawBorder: false },
-                            ticks: { color: textColor, font: { size: 11 } }
-                        },
-                        y: {
-                            grid: { color: gridColor, drawBorder: false },
-                            ticks: { color: textColor, font: { size: 11 } }
-                        }
-                    }
+        // 自动刷新控制
+        function startAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(() => {
+                if (autoRefresh) {
+                    loadStats();
+                    loadLogs();
                 }
-            });
+            }, 3000);
         }
 
-        function updateChartColors() {
-            const isDark = document.body.getAttribute('data-theme') === 'dark';
-            const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
-            const textColor = isDark ? '#9ca3af' : '#6b7280';
-            
-            connectionChart.options.scales.x.grid.color = gridColor;
-            connectionChart.options.scales.y.grid.color = gridColor;
-            connectionChart.options.scales.x.ticks.color = textColor;
-            connectionChart.options.scales.y.ticks.color = textColor;
-            connectionChart.options.plugins.legend.labels.color = textColor;
-            connectionChart.update();
+        function toggleAutoRefresh() {
+            autoRefresh = !autoRefresh;
+            const icon = document.getElementById('refresh-icon');
+            icon.style.opacity = autoRefresh ? '1' : '0.3';
+            showToast(autoRefresh ? '自动刷新已开启' : '自动刷新已暂停', '', 'success');
         }
 
-        function updateChartData(active, total) {
-            const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-            
-            connectionHistory.labels.push(now);
-            connectionHistory.active.push(active);
-            connectionHistory.total.push(total);
-            
-            if (connectionHistory.labels.length > 20) {
-                connectionHistory.labels.shift();
-                connectionHistory.active.shift();
-                connectionHistory.total.shift();
-            }
-            
-            connectionChart.data.labels = connectionHistory.labels;
-            connectionChart.data.datasets[0].data = connectionHistory.active;
-            connectionChart.data.datasets[1].data = connectionHistory.total;
-            connectionChart.update('none');
-        }
-
-        // API helper
+        // API请求
         async function fetchAPI(endpoint, options = {}) {
             try {
                 const response = await fetch(API_BASE + endpoint, {
-                    headers: { 'Content-Type': 'application/json', ...options.headers },
+                    headers: { 'Content-Type': 'application/json' },
                     ...options
                 });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 return await response.json();
             } catch (error) {
-                console.error('API Error:', error);
                 showToast('请求失败', error.message, 'error');
                 return null;
             }
         }
 
-        // Refresh metrics
-        // silent: true 表示不显示toast提示（用于自动刷新）
-        async function refreshMetrics(silent = false) {
-            const data = await fetchAPI('/metrics');
-            if (!data) return;
+        // 加载统计数据
+        async function loadStats() {
+            const [metrics, levelStats] = await Promise.all([
+                fetchAPI('/metrics'),
+                fetchAPI('/logs/stats')
+            ]);
 
-            // Update TCP stats
-            if (data.tcp) {
-                document.getElementById('active-connections').textContent = data.tcp.active_connections || 0;
-                document.getElementById('total-connections').textContent = data.tcp.total_connections || 0;
-                updateChartData(data.tcp.active_connections || 0, data.tcp.total_connections || 0);
-            }
-
-            // Update worker pool stats
-            if (data.worker_pool) {
-                document.getElementById('tasks-processed').textContent = data.worker_pool.tasks_processed || 0;
-                document.getElementById('tasks-failed').textContent = data.worker_pool.tasks_failed || 0;
-                document.getElementById('avg-latency').textContent = (data.worker_pool.avg_latency || 0) + 'ms';
-                document.getElementById('queue-length').textContent = data.worker_pool.queue_length || 0;
-            }
-
-            // 只有手动刷新时才显示提示
-            if (!silent) {
-                showToast('刷新成功', '指标已更新', 'success');
-            }
-        }
-
-        // Reset metrics
-        async function resetMetrics() {
-            if (!confirm('确定要重置所有指标吗？')) return;
-            const data = await fetchAPI('/metrics/reset', { method: 'POST' });
-            if (data) {
-                showToast('重置成功', '所有指标已重置', 'success');
-                refreshMetrics();
-            }
-        }
-
-        // Clear Redis keys
-        async function clearRedisKeys() {
-            if (!confirm('确定要清空所有Redis键吗？此操作不可撤销！')) return;
-            const result = await fetchAPI('/redis/keys');
-            if (result && result.keys) {
-                for (const key of result.keys) {
-                    await fetchAPI(`/redis/key/${key}`, { method: 'DELETE' });
+            if (metrics) {
+                if (metrics.logs) {
+                    document.getElementById('stat-received').textContent = metrics.logs.logs_received || 0;
+                    document.getElementById('stat-processed').textContent = metrics.logs.logs_processed || 0;
+                    document.getElementById('stat-errors').textContent = metrics.logs.logs_failed || 0;
                 }
-                showToast('清空完成', `已删除 ${result.keys.length} 个键`, 'success');
+                if (metrics.system) {
+                    document.getElementById('stat-connections').textContent = metrics.system.active_connections || 0;
+                }
+            }
+
+            if (levelStats && levelStats.stats) {
+                document.getElementById('count-debug').textContent = levelStats.stats.debug || 0;
+                document.getElementById('count-info').textContent = levelStats.stats.info || 0;
+                document.getElementById('count-warn').textContent = levelStats.stats.warn || 0;
+                document.getElementById('count-error').textContent = levelStats.stats.error || 0;
+                document.getElementById('count-fatal').textContent = levelStats.stats.fatal || 0;
             }
         }
 
-        // Load Redis keys
-        async function loadRedisKeys() {
-            const container = document.getElementById('redis-keys-container');
-            container.innerHTML = '<p style="color: var(--text-secondary);">加载中...</p>';
-            
-            const result = await fetchAPI('/redis/keys?pattern=*');
-            if (!result) {
-                container.innerHTML = '<p style="color: var(--danger);">加载失败</p>';
+        // 加载日志
+        async function loadLogs() {
+            const level = document.getElementById('filter-level').value;
+            const source = document.getElementById('filter-source').value;
+            const keyword = document.getElementById('filter-keyword').value;
+
+            let url = '/logs/recent?limit=100';
+            if (level) url += `&level=${level}`;
+            if (source) url += `&source=${source}`;
+            if (keyword) url += `&keywords=${keyword}`;
+
+            const data = await fetchAPI(url);
+            if (!data || !data.Data) return;
+
+            renderLogs(data.Data);
+        }
+
+        // 渲染日志列表
+        function renderLogs(logs) {
+            const container = document.getElementById('log-list');
+
+            if (!logs || logs.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-file-alt"></i>
+                        <p>暂无日志数据</p>
+                    </div>
+                `;
                 return;
             }
 
-            if (result.count === 0) {
-                container.innerHTML = '<p style="color: var(--text-secondary);">暂无数据</p>';
-                return;
-            }
+            container.innerHTML = logs.map(log => `
+                <div class="log-item">
+                    <div class="log-header">
+                        <span class="log-level level-${log.level}">${log.level}</span>
+                        <span class="log-time">${formatTime(log.timestamp)}</span>
+                        ${log.source ? `<span class="log-source">${log.source}</span>` : ''}
+                    </div>
+                    <div class="log-message">${escapeHtml(log.message)}</div>
+                    ${log.tags ? `<div class="log-tags">${log.tags.map(t => `<span class="log-tag">${t}</span>`).join('')}</div>` : ''}
+                </div>
+            `).join('');
+        }
 
-            let html = `<p style="margin-bottom: 10px; color: var(--text-secondary);">共 ${result.count} 个键</p>`;
-            html += '<div style="display: flex; flex-wrap: wrap; gap: 8px;">';
-            result.keys.forEach(key => {
-                html += `<span style="background: rgba(102, 126, 234, 0.1); padding: 4px 12px; border-radius: 4px; font-size: 13px; font-family: monospace;">${key}</span>`;
+        // 应用筛选
+        function applyFilters() {
+            loadLogs();
+            showToast('筛选已应用', '', 'success');
+        }
+
+        // 重置筛选
+        function resetFilters() {
+            document.getElementById('filter-level').value = '';
+            document.getElementById('filter-source').value = '';
+            document.getElementById('filter-keyword').value = '';
+            loadLogs();
+            showToast('筛选已重置', '', 'success');
+        }
+
+        // 清空日志
+        async function clearAllLogs() {
+            if (!confirm('确定要清空所有日志吗？此操作不可撤销！')) return;
+
+            const data = await fetchAPI('/logs', { method: 'DELETE' });
+            if (data) {
+                showToast('日志已清空', '', 'success');
+                loadStats();
+                loadLogs();
+            }
+        }
+
+        // 格式化时间
+        function formatTime(timestamp) {
+            if (!timestamp) return '-';
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString('zh-CN', { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit',
+                fractionalSecondDigits: 3
             });
-            html += '</div>';
-            container.innerHTML = html;
         }
 
-        // Switch tab
-        function switchTab(tabId, btn) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById(tabId).classList.add('active');
+        // HTML转义
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
-        // Toast notification
+        // Toast提示
         function showToast(title, message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
-            toast.style.cssText = `
-                background: var(--card-bg);
-                border-radius: 12px;
-                padding: 16px 20px;
-                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                min-width: 300px;
-                animation: slideIn 0.3s ease-out;
-                border: 1px solid var(--border-color);
-            `;
+            toast.className = 'toast';
             toast.innerHTML = `
-                <div style="width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; background: ${type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${type === 'success' ? '#10b981' : '#ef4444'};">
-                    <i class="fas fa-${type === 'success' ? 'check' : 'exclamation'}"></i>
+                <div style="color: ${type === 'success' ? '#10b981' : '#ef4444'};">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
                 </div>
-                <div style="flex: 1;">
-                    <div style="font-weight: 600; font-size: 14px; color: var(--text-primary);">${title}</div>
-                    <div style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;">${message}</div>
+                <div>
+                    <div style="font-weight: 600; font-size: 14px;">${title}</div>
+                    ${message ? `<div style="font-size: 13px; color: #94a3b8;">${message}</div>` : ''}
                 </div>
             `;
             container.appendChild(toast);
             setTimeout(() => toast.remove(), 3000);
         }
-
-        // Load config
-        async function loadConfig() {
-            const data = await fetchAPI('/config');
-            if (!data) return;
-            
-            if (data.server) {
-                document.getElementById('config-tcp-port').textContent = data.server.Port || '8080';
-            }
-            if (data.app) {
-                document.getElementById('config-workers').textContent = data.app.Workers || '10';
-                document.getElementById('config-queue').textContent = data.app.QueueSize || '1000';
-            }
-        }
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            initTheme();
-            initChart();
-            loadConfig();
-            refreshMetrics(true);  // 首次加载不显示提示
-            setInterval(() => refreshMetrics(true), 5000);  // 自动刷新不显示提示
-        });
     </script>
 </body>
 </html>
